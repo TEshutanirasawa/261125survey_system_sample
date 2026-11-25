@@ -1,0 +1,9 @@
+# data/.htaccess — DBファイル（暗号化済み個人情報を含む）への直接アクセスを禁止
+# Apache 2.4+
+Require all denied
+
+# Apache 2.2 系向け（上のディレクティブが効かない場合のフォールバック）
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

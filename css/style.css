@@ -1,0 +1,852 @@
+/**
+ * 展示ブースアンケート
+ * スタイルシート
+ */
+
+/* ============================================================
+   リセット・ベース
+   ============================================================ */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* アレクシオン版パレット（ロゴから採色した暫定値。正式値入手後はここの数値のみ差し替える） */
+
+    /* メインカラー（濃紫） */
+    --primary:        #4B1A66;
+    --primary-dark:   #3A1350;
+    --primary-light:  #7B4F96;
+
+    /* アクセント（淡紫）※ --accent の上に白文字を置かないこと */
+    --accent:         #B9A3D3;
+    --accent-light:   #E8E0F0;
+
+    /* 背景・ベース */
+    --bg:             #F4F1F8;
+    --surface:        #FFFFFF;
+    --border:         #D9CFE6;
+
+    /* テキスト */
+    --text:           #2B2B32;
+    --text-muted:     #6B6B78;
+
+    /* 状態色 */
+    --danger:         #B3261E;
+    --danger-light:   #FBEAE9;
+    --success:        #2E7D5B;
+
+    /* 半透明（フォーカスリング・影などに使用） */
+    --primary-rgb:    75, 26, 102;   /* #4B1A66 のRGB */
+    --accent-rgb:     185, 163, 211; /* #B9A3D3 のRGB */
+
+    --white:          #FFFFFF;       /* 濃色背景上の文字色 */
+    --radius:         8px;
+    --shadow:         0 2px 12px rgba(var(--primary-rgb), 0.10);
+}
+
+html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-family: '游ゴシック', 'Yu Gothic', 'YuGothic', 'Hiragino Kaku Gothic ProN',
+                 'Hiragino Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    min-height: 100vh;
+}
+
+/* ============================================================
+   イントロカード内ロゴ・タイトル
+   ============================================================ */
+.intro-logo {
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.intro-logo img {
+    width: 80%;
+    max-width: min(80%, 240px); /* 横長ロックアップのため幅基準で上限を付け、高さは auto で比率維持 */
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+
+.intro-company {
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.95em;
+    color: var(--primary-dark);
+    margin-bottom: 10px;
+}
+
+.intro-page-title {
+    font-size: 1.05em;
+    font-weight: 700;
+    color: var(--primary-dark);
+    text-align: center;
+    margin-bottom: 18px;
+    line-height: 1.6;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* ============================================================
+   コンテナ
+   ============================================================ */
+.survey-wrapper {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+}
+
+/* ============================================================
+   イントロカード
+   ============================================================ */
+.intro-card {
+    background: var(--surface);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+}
+
+.intro-card p {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    line-height: 1.85;
+    margin-bottom: 12px;
+}
+
+.intro-card p:last-child {
+    margin-bottom: 0;
+}
+
+.intro-responsible {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+/* ============================================================
+   フォームカード（セクション）
+   ============================================================ */
+.form-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 28px 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.form-card-title {
+    font-size: 1.05em;
+    font-weight: 700;
+    color: var(--primary-dark);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.section-badge {
+    display: inline-block;
+    background: var(--primary);
+    color: var(--white);
+    font-size: 0.75em;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.question-label {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 14px;
+    line-height: 1.6;
+}
+
+.question-note {
+    font-size: 0.82em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.required-mark {
+    color: var(--danger);
+    font-weight: 700;
+    margin-left: 4px;
+    font-size: 0.9em;
+}
+
+/* ============================================================
+   参加証OCR
+   ============================================================ */
+.ocr-area {
+    background: var(--accent-light);
+    border: 1.5px dashed var(--accent);
+    border-radius: var(--radius);
+    padding: 20px 20px;
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.ocr-area p.ocr-desc {
+    font-size: 0.875em;
+    color: var(--primary-dark);
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.btn-ocr {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--primary);
+    color: var(--white);
+    font-size: 1em;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+    text-decoration: none;
+    border: none;
+    min-height: 48px;
+}
+
+.btn-ocr:hover,
+.btn-ocr:active {
+    background: var(--primary-dark);
+}
+
+.ocr-preview {
+    display: block;
+    max-width: 100%;
+    max-height: 220px;
+    margin: 0 auto;
+    border-radius: 6px;
+    object-fit: contain;
+    border: 1px solid var(--border);
+}
+
+.ocr-preview-wrap {
+    margin-top: 14px;
+}
+
+.ocr-status {
+    margin: 10px 0 0;
+    font-size: 0.875em;
+    font-weight: 600;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.ocr-status.loading,
+.ocr-status.success,
+.ocr-status.error {
+    display: flex;
+}
+
+.ocr-status.loading { color: var(--primary); }
+.ocr-status.success { color: var(--success); }
+.ocr-status.error   { color: var(--danger); }
+
+/* 読み込み中スピナー */
+.ocr-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(var(--primary-rgb), 0.25);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: ocrSpin 0.7s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes ocrSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* 撮影ガイド枠 */
+.ocr-guide {
+    margin-bottom: 14px;
+}
+
+.ocr-guide-frame {
+    position: relative;
+    max-width: 280px;
+    aspect-ratio: 16 / 10;
+    margin: 0 auto;
+    background: rgba(var(--primary-rgb), 0.04);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ocr-guide-text {
+    font-size: 0.78em;
+    color: var(--primary-dark);
+    text-align: center;
+    line-height: 1.6;
+    padding: 0 16px;
+}
+
+.ocr-guide-frame .corner {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--primary);
+}
+
+.corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
+.corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
+.corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
+.corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
+
+/* 撮り直しボタン */
+.btn-ocr-retake {
+    display: block;
+    margin: 10px auto 0;
+    background: var(--surface);
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+    font-size: 0.85em;
+    font-weight: 600;
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-ocr-retake:hover {
+    background: var(--accent-light);
+}
+
+.btn-ocr[aria-disabled="true"] {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* ============================================================
+   テキスト入力フォームグループ
+   ============================================================ */
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 1em;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 48px;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+.form-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+/* ============================================================
+   ラジオボタン（縦並び）
+   ============================================================ */
+.radio-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.radio-item {
+    position: relative;
+    cursor: pointer;
+}
+
+.radio-item input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95em;
+    color: var(--text);
+    transition: border-color 0.2s, background 0.2s;
+    min-height: 48px;
+    cursor: pointer;
+}
+
+.radio-label::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.radio-item input[type="radio"]:checked + .radio-label {
+    background: var(--accent-light);
+    border-color: var(--primary);
+    color: var(--primary-dark);
+    font-weight: 600;
+}
+
+.radio-item input[type="radio"]:checked + .radio-label::before {
+    border-color: var(--primary);
+    background: radial-gradient(circle, var(--primary) 50%, transparent 50%);
+}
+
+.radio-item:hover .radio-label {
+    border-color: var(--primary);
+    background: var(--accent-light);
+}
+
+/* 職種専用（2列グリッド） */
+.radio-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.radio-grid .radio-label {
+    justify-content: center;
+    text-align: center;
+}
+
+/* ============================================================
+   チェックボックス
+   ============================================================ */
+.checkbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.checkbox-item {
+    position: relative;
+    cursor: pointer;
+}
+
+.checkbox-item input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95em;
+    color: var(--text);
+    transition: border-color 0.2s, background 0.2s;
+    min-height: 48px;
+    cursor: pointer;
+}
+
+.checkbox-label::before {
+    content: '';
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.checkbox-item input[type="checkbox"]:checked + .checkbox-label {
+    background: var(--accent-light);
+    border-color: var(--primary);
+    color: var(--primary-dark);
+    font-weight: 600;
+}
+
+.checkbox-item input[type="checkbox"]:checked + .checkbox-label::before {
+    background: var(--primary)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'/%3E%3C/svg%3E")
+        center/14px no-repeat;
+    border-color: var(--primary);
+}
+
+.checkbox-item:hover .checkbox-label {
+    border-color: var(--primary);
+    background: var(--accent-light);
+}
+
+/* ============================================================
+   その他テキスト入力
+   ============================================================ */
+.other-input-container {
+    margin-top: 10px;
+    display: none;
+}
+
+.other-input-container.visible {
+    display: block;
+}
+
+.other-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95em;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color 0.2s;
+    resize: vertical;
+    min-height: 60px;
+    -webkit-appearance: none;
+}
+
+.other-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+/* ============================================================
+   メールアドレス欄（Q5条件表示）
+   ============================================================ */
+.email-section {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--accent-light);
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    display: none;
+}
+
+.email-section.visible {
+    display: block;
+}
+
+.email-section label {
+    display: block;
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.email-section input[type="email"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    font-size: 1em;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--surface);
+    min-height: 48px;
+    -webkit-appearance: none;
+    transition: border-color 0.2s;
+}
+
+.email-section input[type="email"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.2);
+}
+
+/* ============================================================
+   送信ボタン
+   ============================================================ */
+.submit-area {
+    text-align: center;
+    margin-top: 32px;
+}
+
+.btn-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--primary);
+    color: var(--white);
+    font-size: 1.1em;
+    font-weight: 700;
+    padding: 16px 60px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    min-height: 56px;
+    letter-spacing: 0.05em;
+    width: 100%;
+    max-width: 400px;
+}
+
+.btn-submit:hover {
+    background: var(--primary-dark);
+}
+
+.btn-submit:active {
+    transform: scale(0.98);
+}
+
+.btn-submit:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   バリデーションエラー
+   ============================================================ */
+.error-msg {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 0.9em;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   サンクスページ（thankyou.php）
+   ============================================================ */
+.thanks-wrapper {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    text-align: center;
+}
+
+.thanks-icon {
+    width: 72px;
+    height: 72px;
+    background: var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2em;
+    margin: 0 auto 20px;
+    color: var(--white);
+}
+
+.thanks-title {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 12px;
+}
+
+/* 粗品案内 */
+.sosina-section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+}
+
+.sosina-note {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 16px;
+    line-height: 1.7;
+}
+
+.sosina-img {
+    max-width: 260px;
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    border-radius: 8px;
+}
+
+.closing-msg {
+    font-size: 1em;
+    color: var(--primary-dark);
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+/* ============================================================
+   レスポンシブ（iPad対応）
+   ============================================================ */
+@media (max-width: 600px) {
+    .survey-wrapper,
+    .thanks-wrapper {
+        padding: 16px 14px 60px;
+    }
+
+    .form-card {
+        padding: 20px 18px;
+    }
+
+    .intro-card {
+        padding: 18px 18px;
+    }
+
+    .radio-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .btn-submit {
+        font-size: 1em;
+        padding: 14px 40px;
+    }
+
+}
+
+/* タブレット（iPad）最適化 */
+@media (min-width: 768px) {
+    html {
+        font-size: 17px;
+    }
+
+    .radio-label,
+    .checkbox-label {
+        min-height: 52px;
+        padding: 14px 18px;
+    }
+
+    .btn-submit {
+        font-size: 1.15em;
+    }
+}
+
+/* ========== スタッフ用入力欄 ========== */
+.staff-section {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.staff-section-title {
+    font-size: 12px;
+    color: #aaa;
+    font-weight: normal;
+    margin: 0 0 14px 0;
+    letter-spacing: 0.03em;
+}
+
+.staff-form-group {
+    margin-bottom: 12px;
+}
+
+.staff-form-group label {
+    display: block;
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 5px;
+}
+
+.staff-form-group input[type="text"],
+.staff-form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #666;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.staff-form-group input[type="text"]::placeholder,
+.staff-form-group textarea::placeholder {
+    color: #ccc;
+}
+
+.staff-form-group input[type="text"]:focus,
+.staff-form-group textarea:focus {
+    outline: none;
+    border-color: #bbb;
+    box-shadow: none;
+}
+
+/* ========== 基本情報の確認表示（survey.php・読み取り専用） ========== */
+.basic-summary {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 10px 16px;
+    font-size: 0.95em;
+}
+
+.basic-summary dt {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.basic-summary dd {
+    color: var(--text);
+    font-weight: 600;
+    word-break: break-all;
+}

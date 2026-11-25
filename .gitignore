@@ -1,0 +1,18 @@
+﻿# 機密情報・設定ファイル（暗号鍵やDB接続情報を含む）
+config.php
+
+# データベース・個人情報（フォルダ構造とアクセス保護設定だけは配布するため、中身のみ除外）
+data/*
+!data/.gitkeep
+!data/.htaccess
+*.db
+*.sqlite
+*.sqlite3
+
+# OS・エディタが生成する不要ファイル
+Thumbs.db
+.DS_Store
+.vscode/
+
+# ログ
+*.log
