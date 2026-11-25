@@ -90,7 +90,7 @@ if ($isLoggedIn && isset($_GET['export']) && $_GET['export'] === 'csv') {
     header('Content-Disposition: attachment; filename="survey_' . date('Ymd_His') . '.csv"');
     echo "\xEF\xBB\xBF"; // BOM
 
-    $cols = ['ID','登録日時','状態','通知','ご芳名','ご所属','都道府県',
+    $cols = ['ID','登録日時','状態','ご芳名','ご所属','都道府県',
              'Q1:本ブースの感想','Q2:きっかけ','Q3:興味のある分野','Q4:ご意見・ご要望',
              'アンケート実施者','メモ'];
     echo implode(',', $cols) . "\n";
@@ -101,7 +101,6 @@ if ($isLoggedIn && isset($_GET['export']) && $_GET['export'] === 'csv') {
             $r['id'],
             $r['created_at'],
             '"' . statusLabel($r['status'] ?? null) . '"',
-            '"' . notifiedLabel($r['notified'] ?? 0) . '"',
             '"' . str_replace('"', '""', decrypt_data($r['name']))     . '"',
             '"' . str_replace('"', '""', decrypt_data($r['facility'])) . '"',
             '"' . str_replace('"', '""', $r['prefecture'])             . '"',
@@ -117,12 +116,9 @@ if ($isLoggedIn && isset($_GET['export']) && $_GET['export'] === 'csv') {
     exit;
 }
 
-// 状態・通知の表示ラベル
+// 状態の表示ラベル
 function statusLabel(?string $status): string {
     return $status === 'basic' ? '基本情報のみ' : '完了';
-}
-function notifiedLabel($notified): string {
-    return ((int)$notified === 1) ? '送信済' : '-';
 }
 
 // 集計バーの幅計算ヘルパー
@@ -279,7 +275,6 @@ function barWidth(int $cnt, int $total): int {
     <h1>展示ブースアンケート管理画面</h1>
     <div class="header-links">
         <a href="index.php">アンケートへ</a>
-        <a href="admin_notify.php">要通知リスト</a>
         <a href="admin_encryption_check.php" style="opacity:.7;">暗号化確認</a>
         <a href="?logout=1">ログアウト</a>
     </div>
@@ -386,7 +381,6 @@ function barWidth(int $cnt, int $total): int {
                         <th>ID</th>
                         <th>日時</th>
                         <th>状態</th>
-                        <th>通知</th>
                         <th>ご芳名</th>
                         <th>ご所属</th>
                         <th>都道府県</th>
@@ -400,14 +394,13 @@ function barWidth(int $cnt, int $total): int {
                 </thead>
                 <tbody>
                     <?php if (empty($rows)): ?>
-                    <tr class="empty-row"><td colspan="13">回答データがありません</td></tr>
+                    <tr class="empty-row"><td colspan="12">回答データがありません</td></tr>
                     <?php else: ?>
                     <?php foreach ($rows as $r): ?>
                     <tr>
                         <td><?= (int)$r['id'] ?></td>
                         <td style="white-space:nowrap;"><?= htmlspecialchars($r['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
                         <td><span class="badge <?= ($r['status'] ?? '') === 'basic' ? 'badge-gray' : 'badge-blue' ?>"><?= statusLabel($r['status'] ?? null) ?></span></td>
-                        <td><?php if ((int)($r['notified'] ?? 0) === 1): ?><span class="badge badge-blue">送信済</span><?php else: ?>-<?php endif; ?></td>
                         <td><?= htmlspecialchars(decrypt_data($r['name']),     ENT_QUOTES, 'UTF-8') ?: '-' ?></td>
                         <td><?= htmlspecialchars(decrypt_data($r['facility']), ENT_QUOTES, 'UTF-8') ?: '-' ?></td>
                         <td><?= htmlspecialchars($r['prefecture'], ENT_QUOTES, 'UTF-8') ?: '-' ?></td>

@@ -3,7 +3,7 @@
  * 展示ブースアンケート
  * 第2画面：アンケート本体（Q1〜Q4・スタッフ使用欄）
  *
- *   POST step=basic  … index.php から。基本情報を保存 → 要通知リスト照合・通知 → GET survey.php へリダイレクト（PRG）
+ *   POST step=basic  … index.php から。基本情報を保存 → GET survey.php へリダイレクト（PRG）
  *   GET              … セッションの response_id のレコードについて Q1〜Q4 を表示
  *   POST step=answer … 既存レコードを UPDATE（status=completed）→ thankyou.php
  *
@@ -12,7 +12,6 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/csrf.php';
-require_once __DIR__ . '/lib/notify.php';
 
 survey_session_start();
 
@@ -89,15 +88,14 @@ if ($method === 'POST' && $step === 'basic') {
     try {
         $pdo  = getDb();
         $stmt = $pdo->prepare("
-            INSERT INTO surveys (created_at, name, facility, prefecture, name_hash, status, notified)
-            VALUES (:created_at, :name, :facility, :prefecture, :name_hash, 'basic', 0)
+            INSERT INTO surveys (created_at, name, facility, prefecture, status)
+            VALUES (:created_at, :name, :facility, :prefecture, 'basic')
         ");
         $stmt->execute([
             ':created_at' => date('Y-m-d H:i:s'),
             ':name'       => encrypt_data($name),
             ':facility'   => encrypt_data($facility),
             ':prefecture' => $prefecture,
-            ':name_hash'  => nameHashEnabled() ? nameHash($name) : null,
         ]);
         $responseId = (int)$pdo->lastInsertId();
     } catch (Exception $e) {
@@ -105,13 +103,6 @@ if ($method === 'POST' && $step === 'basic') {
     }
 
     $_SESSION['response_id'] = $responseId;
-
-    // 要通知リスト照合・通知（失敗してもアンケートは継続。エラーは data/mail_error.log へ）
-    try {
-        notify_registered_visitor($pdo, $responseId, $name, $facility, $prefecture);
-    } catch (\Throwable $e) {
-        mail_error_log('EXCEPTION', get_class($e) . ' response_id=' . $responseId);
-    }
 
     redirect_to('survey.php');
 }
@@ -240,7 +231,7 @@ function h(string $s): string {
     <!-- ヘッダー -->
     <div class="intro-card">
         <div class="intro-logo">
-            <img src="images/alexion_logo.png" alt="アレクシオンファーマ合同会社">
+            <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
         </div>
         <p class="intro-company">アレクシオンファーマ合同会社</p>
         <h1 class="intro-page-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">展示ブースアンケート</h1>

@@ -20,7 +20,7 @@ mb_internal_encoding('UTF-8');
 
     <!-- ロゴ -->
     <div class="intro-logo" style="margin-bottom:28px;">
-        <img src="images/alexion_logo.png" alt="アレクシオンファーマ合同会社">
+        <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
     </div>
 
     <!-- アイコン & タイトル -->

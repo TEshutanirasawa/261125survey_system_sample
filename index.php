@@ -56,7 +56,7 @@ function selected_option(string $key, string $val, array $v): string {
     <!-- イントロ -->
     <div class="intro-card">
         <div class="intro-logo">
-            <img src="images/alexion_logo.png" alt="アレクシオンファーマ合同会社">
+            <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
         </div>
         <p class="intro-company">アレクシオンファーマ合同会社</p>
         <h1 class="intro-page-title">展示ブースアンケート</h1>

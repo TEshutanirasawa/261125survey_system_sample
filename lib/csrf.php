@@ -1,7 +1,7 @@
 <?php
 /**
  * セッション開始・CSRFトークン
- * アンケート画面（index.php / survey.php）と管理画面（admin.php / admin_notify.php）で共通利用する。
+ * アンケート画面（index.php / survey.php）と管理画面（admin.php 等）で共通利用する。
  */
 
 function survey_session_start(): void {

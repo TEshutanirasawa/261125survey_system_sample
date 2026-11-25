@@ -27,8 +27,7 @@ if (isset($_GET['logout'])) {
 // ----- 暗号化対象カラム定義 -----
 $encCols = [
     'name'       => 'ご芳名',
-    'facility'   => 'ご施設名',
-    'email'      => 'メールアドレス',
+    'facility'   => 'ご所属',
     'staff_name' => 'アンケート実施者',
     'staff_memo' => 'メモ',
 ];
@@ -222,7 +221,7 @@ $encRate = ($encCount + $plainCount) > 0
                 <div class="s-label">未暗号化データ</div>
                 <div class="s-value <?= $plainCount > 0 ? 'badge-ng' : 'badge-ok' ?>">
                     <?php if ($plainCount > 0): ?>
-                    ⚠ <?= $plainCount ?>件あり → <a href="migrate_encrypt.php?key=sample-demo" target="_blank" style="color:var(--danger);">マイグレーション実行</a>
+                    ⚠ <?= $plainCount ?>件あり
                     <?php else: ?>
                     ✓ なし
                     <?php endif; ?>
@@ -308,10 +307,9 @@ $encRate = ($encCount + $plainCount) > 0
         <ul style="padding-left:20px;line-height:1.9;font-size:.9em;color:#555;margin-top:4px;">
             <li>暗号化キー（<code>ENCRYPTION_KEY</code>）は絶対にGit等にコミットしないでください</li>
             <li>キーを変更・紛失すると既存の暗号化データを復元できなくなります</li>
-            <li>デフォルトキーのまま本番運用しないでください。<code>config.php</code>のキーを変更してください</li>
+            <li>キーは <code>data/secrets.php</code> の <code>ENCRYPTION_KEY</code> で設定します</li>
             <li>新キー生成コマンド: <code>php -r "echo bin2hex(random_bytes(32));"</code></li>
             <li>キーのバックアップは安全な場所（パスワードマネージャー等）に保管してください</li>
-            <li><code>migrate_encrypt.php</code> は実行完了後、削除またはアクセス制限してください</li>
         </ul>
     </div>
 
