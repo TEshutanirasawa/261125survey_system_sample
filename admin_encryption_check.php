@@ -1,7 +1,7 @@
 <?php
 /**
  * 暗号化確認画面
- * 展示ブースアンケート
+ * IgG4関連疾患アンケート
  */
 
 require_once __DIR__ . '/config.php';
@@ -69,17 +69,17 @@ $encRate = ($encCount + $plainCount) > 0
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗号化確認 | サンプル管理</title>
+    <title>暗号化確認 | IgG4関連疾患アンケート</title>
     <style>
         *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
         :root {
-            /* アレクシオン版パレット（css/style.css の :root と同値） */
-            --primary:#4B1A66; --primary-dark:#3A1350; --primary-light:#7B4F96;
-            --accent:#B9A3D3; --accent-light:#E8E0F0;
-            --bg:#F4F1F8; --surface:#FFFFFF; --white:#fff; --border:#D9CFE6;
-            --text:#2B2B32; --sub:#6B6B78;
+            /* 田辺ファーマ／ユプリズナ版パレット（css/style.css の :root と同系） */
+            --brand-teal:#00B0B9; --primary:#007C83; --primary-dark:#00636A; --primary-light:#E6F7F8;
+            --lime:#DAD700;
+            --bg:#F5F8F8; --surface:#FFFFFF; --white:#fff; --border:#D5E3E5;
+            --text:#1F2A30; --sub:#5F6B70;
             --danger:#B3261E; --danger-light:#FBEAE9; --success:#2E7D5B; --green:var(--success);
-            --primary-rgb:75, 26, 102; --accent-rgb:185, 163, 211;
+            --primary-rgb:0, 124, 131;
         }
         body { font-family:'Yu Gothic UI','Hiragino Sans',sans-serif; background:var(--bg); color:var(--text); font-size:14px; }
 
@@ -122,7 +122,7 @@ $encRate = ($encCount + $plainCount) > 0
         /* table */
         .table-wrap { overflow-x:auto; }
         table { width:100%; border-collapse:collapse; min-width:700px; }
-        thead th { background:var(--accent-light); color:var(--primary-dark); font-size:.82em; font-weight:700; padding:9px 10px; text-align:left; white-space:nowrap; border-bottom:2px solid var(--primary); }
+        thead th { background:var(--primary-light); color:var(--primary-dark); font-size:.82em; font-weight:700; padding:9px 10px; text-align:left; white-space:nowrap; border-bottom:2px solid var(--primary); }
         tbody td { padding:8px 10px; font-size:.82em; border-bottom:1px solid var(--border); vertical-align:top; }
         tbody tr:hover td { background:var(--bg); }
         .enc-ok  { color:var(--green); font-weight:600; }
@@ -133,7 +133,7 @@ $encRate = ($encCount + $plainCount) > 0
         .db-error { background:var(--danger-light); color:var(--danger); border:1px solid var(--danger); padding:12px 16px; border-radius:6px; margin-bottom:20px; }
 
         /* progress bar */
-        .progress-wrap { background:var(--accent-light); border-radius:4px; height:16px; overflow:hidden; margin-top:10px; }
+        .progress-wrap { background:var(--primary-light); border-radius:4px; height:16px; overflow:hidden; margin-top:10px; }
         .progress-bar { height:100%; background:var(--green); border-radius:4px; transition:width .4s; }
     </style>
 </head>
@@ -142,7 +142,7 @@ $encRate = ($encCount + $plainCount) > 0
 <?php if (!$isLoggedIn): ?>
 <div class="login-wrap">
     <div class="login-box">
-        <h2>サンプル管理ログイン</h2>
+        <h2>IgG4関連疾患アンケート 管理画面</h2>
         <form method="POST">
             <input type="password" name="password" placeholder="パスワードを入力" required autofocus>
             <button type="submit" name="login" value="1">ログイン</button>

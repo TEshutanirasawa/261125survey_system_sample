@@ -232,6 +232,34 @@ function question_suffix(string $type): string {
 }
 
 /**
+ * DB に保存された回答文字列を、選択した選択肢の配列に戻す。
+ * 選択肢の文言自体に「、」を含むものがあるため単純な explode はできない。
+ * 保存時は定義の選択肢順に「、」でつないでいるので、定義順に先頭から照合して取り出す。
+ */
+function split_answer(string $value, array $q): array {
+    if ($value === '') return [];
+    if ($q['type'] === 'single') return [$value];
+    $found = [];
+    $pos = 0;
+    $len = strlen($value);
+    foreach ($q['options'] as $opt) {
+        $ol = strlen($opt);
+        if (substr($value, $pos, $ol) !== $opt) continue;
+        $end = $pos + $ol;
+        if ($end === $len) {
+            $found[] = $opt;
+            $pos = $end;
+            break;
+        }
+        if (substr($value, $end, strlen('、')) === '、') {
+            $found[] = $opt;
+            $pos = $end + strlen('、');
+        }
+    }
+    return $found;
+}
+
+/**
  * 回答者区分・経路から、通る設問IDを順に返す（スライドは含まない）
  *   doctor/top2    : d1 d2 d3 d4 d5 d6 d7 d8
  *   doctor/bottom2 : d1 d2 d3 d4 d6 d7 d8
