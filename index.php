@@ -1,12 +1,13 @@
 <?php
 /**
- * 展示ブースアンケート
+ * IgG4関連疾患に関するアンケート
  * 第1画面：基本情報（ご芳名・ご所属・都道府県）
- * 送信先は survey.php（基本情報の保存・要通知リスト照合・Q1〜Q4表示）
+ * 送信先は survey.php（基本情報の保存 → 設問のステップ表示）
  */
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/csrf.php';
+require_once __DIR__ . '/lib/layout.php';
 
 survey_session_start();
 
@@ -44,25 +45,24 @@ function selected_option(string $key, string $val, array $v): string {
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>展示ブースアンケート | アレクシオンファーマ合同会社</title>
-    <link rel="stylesheet" href="css/style.css?v=20261007b">
+<?php layout_head('IgG4関連疾患に関するアンケート | 田辺ファーマ株式会社'); ?>
 </head>
 <body>
 
-<div class="survey-wrapper">
+<?php layout_header(); ?>
 
-    <!-- イントロ -->
-    <div class="intro-card">
-        <div class="intro-logo">
-            <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
-        </div>
-        <p class="intro-company">アレクシオンファーマ合同会社</p>
-        <h1 class="intro-page-title">展示ブースアンケート</h1>
-        <p>本日は，弊社の展示ブースにお立ち寄りいただきまして誠にありがとうございます。</p>
-        <p>今後のサービス向上のため，下記アンケートにご協力賜りますようお願い致します。ご回答頂いたアンケートの内容は，本件の目的以外には使用いたしません。アンケート結果の取り扱いに関しては、弊社のプライバシーポリシーに則り管理いたします。</p>
-        <p class="intro-responsible">アンケート実施者　アレクシオンファーマ合同会社　●●部　●● ●●</p>
+<main class="survey-wrapper">
+
+    <?php layout_title(); ?>
+
+    <!-- 挨拶 -->
+    <div class="intro-card has-corner-deco">
+        <p class="intro-company">田辺ファーマ株式会社</p>
+        <h2 class="intro-heading">IgG4関連疾患に関するアンケート</h2>
+        <p>本日は、弊社の展示ブースにお立ち寄りいただきまして誠にありがとうございます。</p>
+        <p>今後のサービス向上のため、下記アンケートにご協力賜りますようお願い致します。ご回答頂いたアンケートの内容は、本件の目的以外には使用いたしません。アンケート結果の取り扱いに関しては、弊社のプライバシーポリシーに則り管理いたします。</p>
+        <p class="intro-responsible">アンケート実施者　田辺ファーマ株式会社　●●部　●● ●●</p>
+        <img class="corner-deco" src="images/tanabe3.png" alt="" aria-hidden="true" width="799" height="493">
     </div>
 
     <?php if (!empty($errors)): ?>
@@ -142,8 +142,16 @@ function selected_option(string $key, string $val, array $v): string {
         </div>
 
     </form>
-</div>
 
-<script src="js/app.js?v=20261007a"></script>
+    <!-- キービジュアル（トリミングしない：右下の注釈を必ず残す） -->
+    <div class="kv">
+        <img src="images/IgG4_KV_web.jpg" alt="描く、未来の景色を。―初の※IgG4関連疾患治療薬、登場―" width="1600" height="1244">
+    </div>
+
+</main>
+
+<?php layout_footer_deco('images/tanabe4.png', 1280, 259); ?>
+
+<?php layout_script(); ?>
 </body>
 </html>

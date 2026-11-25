@@ -15,6 +15,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/csrf.php';
 require_once __DIR__ . '/lib/questions.php';
+require_once __DIR__ . '/lib/layout.php';
 
 survey_session_start();
 
@@ -329,25 +330,18 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>IgG4関連疾患に関するアンケート | 田辺ファーマ株式会社</title>
-    <link rel="stylesheet" href="css/style.css?v=20261007b">
+<?php layout_head('IgG4関連疾患に関するアンケート | 田辺ファーマ株式会社'); ?>
 </head>
 <body>
 
-<div class="survey-wrapper">
+<?php layout_header(); ?>
 
-    <!-- ヘッダー -->
-    <div class="intro-card">
-        <div class="intro-logo">
-            <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
-        </div>
-        <h1 class="intro-page-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">IgG4関連疾患に関するアンケート</h1>
-    </div>
+<main class="survey-wrapper">
+
+    <?php layout_title(); ?>
 
     <?php if ($globalError !== ''): ?>
-    <div class="error-msg" style="margin-bottom:20px;"><?= h($globalError) ?></div>
+    <div class="error-msg"><?= h($globalError) ?></div>
     <?php endif; ?>
 
     <form id="surveyForm" class="stepper" method="post" action="survey.php"
@@ -443,7 +437,9 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
         </div>
 
     </form>
-</div>
+</main>
+
+<?php layout_footer_deco('images/tanabe4.png', 1280, 259); ?>
 
 <!-- スライドの全画面表示 -->
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="スライドの拡大表示">
@@ -451,6 +447,6 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
     <img class="lightbox-img" alt="">
 </div>
 
-<script src="js/app.js?v=20261007a"></script>
+<?php layout_script(); ?>
 </body>
 </html>
