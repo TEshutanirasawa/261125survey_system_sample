@@ -1,17 +1,25 @@
 <?php
 /**
- * 展示ブースアンケート
+ * IgG4関連疾患に関するアンケート
  * ご協力ありがとうページ
+ *
+ * survey.php から1回限りのフラグ thanks_ended_early を受け取り、
+ * 医師以外で N2「今回初めて知った」により早期終了した場合は疾患展示の案内を表示する。
  */
+require_once __DIR__ . '/lib/csrf.php';
 date_default_timezone_set('Asia/Tokyo');
 mb_internal_encoding('UTF-8');
+
+survey_session_start();
+$endedEarly = !empty($_SESSION['thanks_ended_early']);
+unset($_SESSION['thanks_ended_early']);
 ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ご協力ありがとうございました | アレクシオンファーマ合同会社</title>
+    <title>ご協力ありがとうございました | 田辺ファーマ株式会社</title>
     <link rel="stylesheet" href="css/style.css?v=20261007b">
 </head>
 <body>
@@ -34,7 +42,11 @@ mb_internal_encoding('UTF-8');
 
     <h1 class="thanks-title">アンケートのご協力<br>ありがとうございました。</h1>
 
+    <?php if ($endedEarly): ?>
+    <p class="closing-msg">IgG4関連疾患について、ブース内の疾患関連の展示をぜひご覧ください。</p>
+    <?php else: ?>
     <p class="closing-msg">どうぞブース内にてごゆっくりお過ごしください。</p>
+    <?php endif; ?>
 
 </div>
 
