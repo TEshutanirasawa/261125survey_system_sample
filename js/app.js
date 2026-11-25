@@ -1,5 +1,5 @@
 /**
- * 展示ブースアンケート
+ * IgG4関連疾患に関するアンケート
  * JavaScript
  */
 
@@ -329,59 +329,11 @@
     }
 
     // ============================================================
-    // 「その他」テキスト欄の表示切り替え
+    // 基本情報フォーム（index.php）のバリデーション & 送信
     // ============================================================
-    function setupOtherToggles() {
-        var toggles = [
-            { checkId: 'q1_other_check', containerId: 'q1_other_container', type: 'radio' },
-            { checkId: 'q2_other_check', containerId: 'q2_other_container', type: 'radio' },
-            { checkId: 'q3_other_check', containerId: 'q3_other_container', type: 'checkbox' },
-        ];
-
-        toggles.forEach(function (t) {
-            if (t.type === 'radio') {
-                var check = document.getElementById(t.checkId);
-                if (!check) return;
-                var groupName = check.name;
-                var radios = document.querySelectorAll('input[name="' + groupName + '"]');
-                var container = document.getElementById(t.containerId);
-                if (!container) return;
-
-                radios.forEach(function (radio) {
-                    radio.addEventListener('change', function () {
-                        if (this.value === 'その他') {
-                            container.classList.add('visible');
-                        } else {
-                            container.classList.remove('visible');
-                            var inp = container.querySelector('input, textarea');
-                            if (inp) inp.value = '';
-                        }
-                    });
-                });
-            } else {
-                var checkEl     = document.getElementById(t.checkId);
-                var containerEl = document.getElementById(t.containerId);
-                if (!checkEl || !containerEl) return;
-
-                checkEl.addEventListener('change', function () {
-                    if (this.checked) {
-                        containerEl.classList.add('visible');
-                    } else {
-                        containerEl.classList.remove('visible');
-                        var inputEl = containerEl.querySelector('input, textarea');
-                        if (inputEl) inputEl.value = '';
-                    }
-                });
-            }
-        });
-    }
-
-    // ============================================================
-    // フォームバリデーション & 送信
-    // ============================================================
-    function setupFormSubmit() {
+    function setupBasicFormSubmit() {
         var form = document.getElementById('surveyForm');
-        if (!form) return;
+        if (!form || !document.getElementById('name')) return;
 
         form.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -390,57 +342,18 @@
             if (existing) existing.remove();
 
             var errors = [];
-
-            // 画面ごとに存在する項目だけを検証する（index.php＝基本情報 / survey.php＝Q1〜Q4）
-            var hasBasic     = !!document.getElementById('name');
-            var hasQuestions = !!document.querySelector('input[name="q1"]');
-
-            if (hasBasic) {
-                var textRequired = [
-                    { id: 'name',     label: 'ご芳名' },
-                    { id: 'facility', label: 'ご所属' },
-                ];
-                textRequired.forEach(function (f) {
-                    var el = document.getElementById(f.id);
-                    if (!el || !el.value.trim()) {
-                        errors.push(f.label + ' を入力してください');
-                    }
-                });
-
-                var pref = document.getElementById('prefecture');
-                if (!pref || !pref.value) {
-                    errors.push('都道府県 を選択してください');
+            [
+                { id: 'name',     label: 'ご芳名' },
+                { id: 'facility', label: 'ご所属' }
+            ].forEach(function (f) {
+                var el = document.getElementById(f.id);
+                if (!el || !el.value.trim()) {
+                    errors.push(f.label + ' を入力してください');
                 }
-            }
-
-            var q1 = document.querySelector('input[name="q1"]:checked');
-            if (hasQuestions && !q1) {
-                errors.push('Q1 を選択してください');
-            }
-            if (q1 && q1.value === 'その他') {
-                var q1other = document.querySelector('input[name="q1_other"]');
-                if (!q1other || !q1other.value.trim()) {
-                    errors.push('Q1「その他」の内容を入力してください');
-                }
-            }
-
-            var q2 = document.querySelector('input[name="q2"]:checked');
-            if (hasQuestions && !q2) {
-                errors.push('Q2 を選択してください');
-            }
-            if (q2 && q2.value === 'その他') {
-                var q2other = document.querySelector('input[name="q2_other"]');
-                if (!q2other || !q2other.value.trim()) {
-                    errors.push('Q2「その他」の内容を入力してください');
-                }
-            }
-
-            var q3OtherCheck = document.getElementById('q3_other_check');
-            if (q3OtherCheck && q3OtherCheck.checked) {
-                var q3other = document.querySelector('input[name="q3_other"]');
-                if (!q3other || !q3other.value.trim()) {
-                    errors.push('Q3「その他」の内容を入力してください');
-                }
+            });
+            var pref = document.getElementById('prefecture');
+            if (!pref || !pref.value) {
+                errors.push('都道府県 を選択してください');
             }
 
             if (errors.length > 0) {
@@ -464,6 +377,313 @@
     }
 
     // ============================================================
+    // 選択肢の挙動（単独回答・2つまで）
+    //   単独回答（data-exclusive）：選ぶと同じ設問の他をすべて外す／他を選ぶと単独回答を外す
+    //   max2：2つ選ぶと未選択の選択肢を disabled にする（単独回答も1つ分として数える）
+    // ============================================================
+    function refreshChoiceGroup(list) {
+        if (list.getAttribute('data-qtype') !== 'max2') return;
+        var boxes = list.querySelectorAll('input[type="checkbox"]');
+        var count = 0;
+        boxes.forEach(function (b) { if (b.checked) count++; });
+        boxes.forEach(function (b) {
+            b.disabled = !b.checked && count >= 2;
+        });
+    }
+
+    function setupChoices(root) {
+        root.querySelectorAll('.checkbox-list[data-qtype]').forEach(function (list) {
+            list.addEventListener('change', function (e) {
+                var el = e.target;
+                if (!el || el.type !== 'checkbox') return;
+                if (el.checked) {
+                    var isExclusive = el.hasAttribute('data-exclusive');
+                    list.querySelectorAll('input[type="checkbox"]').forEach(function (b) {
+                        if (b === el) return;
+                        if (isExclusive || b.hasAttribute('data-exclusive')) b.checked = false;
+                    });
+                }
+                refreshChoiceGroup(list);
+            });
+            refreshChoiceGroup(list);
+        });
+    }
+
+    // ============================================================
+    // アンケート本体（survey.php）：1問1画面のステップ表示・分岐
+    // ============================================================
+    function setupStepper() {
+        var form = document.querySelector('form.stepper');
+        if (!form) return;
+
+        var steps = {};
+        form.querySelectorAll('.step[data-step]').forEach(function (s) {
+            steps[s.getAttribute('data-step')] = s;
+        });
+
+        var D4_TOP2 = [];
+        try { D4_TOP2 = JSON.parse(form.getAttribute('data-d4-top2') || '[]'); } catch (err) { D4_TOP2 = []; }
+        var N2_END = form.getAttribute('data-n2-end') || '';
+
+        var btnBack   = form.querySelector('.btn-back');
+        var btnNext   = form.querySelector('.btn-next');
+        var staff     = form.querySelector('.staff-section');
+        var progFill  = form.querySelector('.progress-fill');
+        var progText  = form.querySelector('.progress-text');
+        var wrapper   = document.querySelector('.survey-wrapper');
+        var submitting = false;
+        var current   = 'type';
+
+        function value(name) {
+            var el = form.querySelector('input[name="' + name + '"]:checked');
+            return el ? el.value : '';
+        }
+
+        // 現時点の回答から確定している経路（ステップIDの並び）
+        function computePath() {
+            var rt = value('respondent_type');
+            var p = ['type'];
+            if (rt === 'doctor' || rt === '') {
+                // 職種が未選択の間は医師の経路で数える（分母の表示用。ステップ数は top2/bottom2 とも同じ）
+                if (rt === '') return p.concat(['d1', 'd2', 'd3', 'd4', 'd5', 's_mit', 'd6', 'd7', 'd8']);
+                p.push('d1', 'd2', 'd3', 'd4');
+                var d4 = value('d4');
+                if (d4 !== '' && D4_TOP2.indexOf(d4) === -1) {
+                    p.push('s_kei', 's_mit');
+                } else {
+                    p.push('d5', 's_mit');
+                }
+                p.push('d6', 'd7', 'd8');
+            } else {
+                p.push('n1', 'n2');
+                if (value('n2') !== N2_END) p.push('n3', 'n4', 'n5');
+            }
+            return p;
+        }
+
+        // 経路から外れた設問の入力をクリアする（送信時に不要な値を送らない）
+        function clearOffPath() {
+            if (value('respondent_type') === '') return;
+            var path = computePath();
+            Object.keys(steps).forEach(function (id) {
+                if (id === 'type' || path.indexOf(id) !== -1) return;
+                var changed = false;
+                steps[id].querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(function (inp) {
+                    if (inp.checked) { inp.checked = false; changed = true; }
+                    inp.disabled = false;
+                });
+                if (changed) hideError(steps[id]);
+            });
+        }
+
+        function showError(stepEl, msg) {
+            var p = stepEl.querySelector('.step-error');
+            if (!p) return;
+            p.textContent = msg;
+            p.hidden = false;
+        }
+        function hideError(stepEl) {
+            var p = stepEl.querySelector('.step-error');
+            if (p) { p.hidden = true; p.textContent = ''; }
+        }
+
+        // 現在のステップが回答済みか（スライドは常にOK）
+        function validateStep(id) {
+            var stepEl = steps[id];
+            var list = stepEl.querySelector('[data-qtype]');
+            if (!list) return true;
+            var checked = list.querySelectorAll('input:checked').length;
+            if (checked > 0) { hideError(stepEl); return true; }
+            showError(stepEl, list.getAttribute('data-qtype') === 'single'
+                ? '1つ選択してください' : '1つ以上選択してください');
+            return false;
+        }
+
+        function render(scroll) {
+            var path = computePath();
+            var idx  = path.indexOf(current);
+            if (idx === -1) { current = 'type'; idx = 0; }
+            var isLast = (idx === path.length - 1);
+
+            Object.keys(steps).forEach(function (id) {
+                steps[id].hidden = (id !== current);
+            });
+
+            btnBack.hidden = (idx === 0);
+            btnNext.textContent = isLast ? '送信する' : '次へ';
+            btnNext.classList.toggle('is-submit', isLast);
+            if (staff) staff.hidden = !isLast;
+
+            var ratio = (idx + 1) / path.length;
+            if (progFill) progFill.style.width = Math.round(ratio * 100) + '%';
+            if (progText) progText.textContent = (idx + 1) + ' / ' + path.length;
+
+            if (wrapper) wrapper.classList.toggle('is-slide', steps[current].classList.contains('step-slide'));
+
+            if (scroll) window.scrollTo(0, 0);
+        }
+
+        function submitForm() {
+            if (submitting) return;
+            // 送信直前にも経路外の入力を外しておく
+            clearOffPath();
+            var path = computePath();
+            for (var i = 0; i < path.length; i++) {
+                if (!validateStep(path[i])) {
+                    current = path[i];
+                    render(true);
+                    return;
+                }
+            }
+            submitting = true;
+            btnNext.disabled = true;
+            btnBack.disabled = true;
+            btnNext.textContent = '送信中...';
+            form.submit();
+        }
+
+        function goNext() {
+            if (submitting) return;
+            if (!validateStep(current)) return;
+            var path = computePath();
+            var idx  = path.indexOf(current);
+            if (idx === path.length - 1) {
+                submitForm();
+                return;
+            }
+            current = path[idx + 1];
+            render(true);
+        }
+
+        function goBack() {
+            if (submitting) return;
+            var path = computePath();
+            var idx  = path.indexOf(current);
+            if (idx > 0) {
+                current = path[idx - 1];
+                render(true);
+            }
+        }
+
+        btnNext.addEventListener('click', goNext);
+        btnBack.addEventListener('click', goBack);
+
+        // Enterキー等による暗黙の送信は「次へ」と同じ扱いにする
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            goNext();
+        });
+
+        // 回答の変更：エラー表示を消す／分岐に関わる設問なら経路外をクリア／ボタン表示を更新
+        form.addEventListener('change', function (e) {
+            var el = e.target;
+            if (!el || !el.name) return;
+            var stepEl = el.closest('.step');
+            if (stepEl && el.checked) hideError(stepEl);
+            if (el.name === 'respondent_type' || el.name === 'd4' || el.name === 'n2') {
+                clearOffPath();
+            }
+            render(false);
+        });
+
+        // 初期表示：サーバー側エラー時はそのステップ（保存失敗時は最後のステップ）を開く
+        var initial = form.getAttribute('data-initial-step') || '';
+        if (initial === '__last__') {
+            var p0 = computePath();
+            current = p0[p0.length - 1];
+        } else if (initial && steps[initial]) {
+            current = initial;
+        }
+        render(false);
+    }
+
+    // ============================================================
+    // スライド：カルーセル（左右ボタン・スワイプ・ページ表示）
+    //   横スクロール + scroll-snap でスワイプはブラウザ標準の挙動に任せる
+    // ============================================================
+    function setupCarousels() {
+        document.querySelectorAll('[data-carousel]').forEach(function (c) {
+            var viewport = c.querySelector('.carousel-viewport');
+            var slides   = c.querySelectorAll('.carousel-slide');
+            var prev     = c.querySelector('.carousel-prev');
+            var next     = c.querySelector('.carousel-next');
+            var curEl    = c.querySelector('.carousel-current');
+            if (!viewport || slides.length === 0) return;
+
+            function index() {
+                var w = viewport.clientWidth || 1;
+                return Math.max(0, Math.min(slides.length - 1, Math.round(viewport.scrollLeft / w)));
+            }
+            function update() {
+                var i = index();
+                if (curEl) curEl.textContent = String(i + 1);
+                if (prev) prev.disabled = (i === 0);
+                if (next) next.disabled = (i === slides.length - 1);
+            }
+            function goTo(i) {
+                i = Math.max(0, Math.min(slides.length - 1, i));
+                viewport.scrollTo({ left: i * viewport.clientWidth, behavior: 'smooth' });
+            }
+
+            if (prev) prev.addEventListener('click', function () { goTo(index() - 1); });
+            if (next) next.addEventListener('click', function () { goTo(index() + 1); });
+
+            var ticking = false;
+            viewport.addEventListener('scroll', function () {
+                if (ticking) return;
+                ticking = true;
+                window.requestAnimationFrame(function () { ticking = false; update(); });
+            }, { passive: true });
+
+            viewport.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(index() - 1); }
+                if (e.key === 'ArrowRight') { e.preventDefault(); goTo(index() + 1); }
+            });
+
+            // 非表示ステップから表示に切り替わった・画面回転した場合も位置を合わせ直す
+            window.addEventListener('resize', update);
+            update();
+        });
+    }
+
+    // ============================================================
+    // スライド：タップで全画面表示（ピンチ拡大はブラウザ標準の機能を使う）
+    // ============================================================
+    function setupLightbox() {
+        var box = document.getElementById('lightbox');
+        if (!box) return;
+        var img      = box.querySelector('.lightbox-img');
+        var closeBtn = box.querySelector('.lightbox-close');
+        var lastFocus = null;
+
+        function open(src, alt) {
+            lastFocus = document.activeElement;
+            img.src = src;
+            img.alt = alt || '';
+            box.hidden = false;
+            document.body.classList.add('lightbox-open');
+            closeBtn.focus();
+        }
+        function close() {
+            box.hidden = true;
+            img.removeAttribute('src');
+            document.body.classList.remove('lightbox-open');
+            if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+
+        document.querySelectorAll('img[data-zoomable]').forEach(function (el) {
+            el.addEventListener('click', function () { open(el.currentSrc || el.src, el.alt); });
+        });
+        closeBtn.addEventListener('click', close);
+        box.addEventListener('click', function (e) {
+            if (e.target === box) close();
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !box.hidden) close();
+        });
+    }
+
+    // ============================================================
     // タッチフィードバック
     // ============================================================
     function setupHaptic() {
@@ -479,8 +699,11 @@
     // ============================================================
     function init() {
         initOcr();
-        setupOtherToggles();
-        setupFormSubmit();
+        setupBasicFormSubmit();
+        setupChoices(document);
+        setupStepper();
+        setupCarousels();
+        setupLightbox();
         setupHaptic();
     }
 

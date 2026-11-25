@@ -850,3 +850,276 @@ body {
     font-weight: 600;
     word-break: break-all;
 }
+
+/* ============================================================
+   ステップ形式（survey.php）
+   ============================================================ */
+.step[hidden],
+.staff-section[hidden],
+.step-error[hidden],
+.btn-back[hidden],
+.lightbox[hidden] {
+    display: none !important;
+}
+
+/* 進捗バー */
+.progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.progress-track {
+    flex: 1;
+    height: 8px;
+    background: var(--primary-light);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand-teal), var(--lime));
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.progress-text {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 設問 */
+.q-suffix {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.step-error {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 600;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+}
+
+/* max2：上限に達した未選択の選択肢 */
+.checkbox-item input[type="checkbox"]:disabled + .checkbox-label {
+    opacity: 0.45;
+    background: #F2F4F5;
+    cursor: not-allowed;
+}
+
+.checkbox-item:hover input[type="checkbox"]:disabled + .checkbox-label {
+    border-color: var(--border);
+}
+
+/* 戻る／次へ */
+.step-nav {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 28px;
+}
+
+.step-nav button {
+    min-height: 56px;
+    border-radius: var(--radius);
+    font-size: 1.05em;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    letter-spacing: 0.05em;
+}
+
+.step-nav button:active {
+    transform: scale(0.98);
+}
+
+.btn-back {
+    flex: 0 0 auto;
+    min-width: 120px;
+    padding: 14px 24px;
+    background: var(--surface);
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+}
+
+.btn-back:hover {
+    background: var(--primary-light);
+}
+
+.btn-next {
+    flex: 1 1 auto;
+    max-width: 400px;
+    padding: 14px 32px;
+    background: var(--primary);
+    color: var(--white);
+    border: none;
+}
+
+.btn-next:hover {
+    background: var(--primary-dark);
+}
+
+.btn-next:disabled,
+.btn-back:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ============================================================
+   スライド（カルーセル・プレースホルダー・全画面表示）
+   ============================================================ */
+.slide-card {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.carousel {
+    position: relative;
+}
+
+.carousel-viewport {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 6px;
+    background: #F4F7F8;
+    border: 1px solid var(--border);
+}
+
+.carousel-viewport::-webkit-scrollbar {
+    display: none;
+}
+
+.carousel-viewport:focus-visible {
+    outline: 3px solid rgba(var(--primary-rgb), 0.35);
+    outline-offset: 2px;
+}
+
+.carousel-slide {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.carousel-slide img {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: zoom-in;
+}
+
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 4px;
+}
+
+.carousel-btn:disabled {
+    opacity: 0.2;
+    cursor: default;
+}
+
+.carousel-prev { left: 8px; }
+.carousel-next { right: 8px; }
+
+.carousel-counter {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.95em;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.slide-hint {
+    text-align: center;
+    font-size: 0.82em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.slide-placeholder {
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    border: 2px dashed var(--brand-teal);
+    border-radius: 8px;
+    background: var(--primary-light);
+    color: var(--text-muted);
+    font-weight: 700;
+    line-height: 1.6;
+}
+
+.lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.lightbox-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+}
+
+body.lightbox-open {
+    overflow: hidden;
+}

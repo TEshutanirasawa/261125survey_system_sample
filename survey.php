@@ -1,23 +1,30 @@
 <?php
 /**
- * 展示ブースアンケート
- * 第2画面：アンケート本体（Q1〜Q4・スタッフ使用欄）
+ * IgG4関連疾患に関するアンケート
+ * 第2画面：アンケート本体（1問1画面のステップ形式・設問分岐・スライド表示・スタッフ使用欄）
  *
  *   POST step=basic  … index.php から。基本情報を保存 → GET survey.php へリダイレクト（PRG）
- *   GET              … セッションの response_id のレコードについて Q1〜Q4 を表示
- *   POST step=answer … 既存レコードを UPDATE（status=completed）→ thankyou.php
+ *   GET              … セッションの response_id のレコードについて設問を表示
+ *   POST step=answer … lib/questions.php の定義でサーバー側検証 → 既存レコードを UPDATE（status=completed）→ thankyou.php
  *
- * 一方通行：response_id が無い GET / 不正な POST は index.php へ戻す。戻るボタン・基本情報の修正リンクは置かない。
+ * 設問・選択肢・分岐条件・スライドは lib/questions.php で定義する。
+ * 画面は1つのフォームの中に全ステップを持ち、js/app.js で1ステップずつ表示する（送信は最後に1回だけ）。
+ * 一方通行：response_id が無い GET / 不正な POST は index.php へ戻す。
  */
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/lib/csrf.php';
+require_once __DIR__ . '/lib/questions.php';
 
 survey_session_start();
 
 function redirect_to(string $path): void {
     header('Location: ' . $path);
     exit;
+}
+
+function h(string $s): string {
+    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 }
 
 /**
@@ -40,6 +47,50 @@ function load_basic_record(): array {
         redirect_to('index.php');
     }
     return $row;
+}
+
+/**
+ * POST値を「文字列」または「文字列の配列」に正規化する（想定外の型は空扱い）
+ */
+function posted_single(string $key): string {
+    $v = $_POST[$key] ?? '';
+    return is_string($v) ? trim($v) : '';
+}
+function posted_multi(string $key): array {
+    $v = $_POST[$key] ?? [];
+    if (!is_array($v)) return [];
+    $out = [];
+    foreach ($v as $item) {
+        if (is_string($item) && trim($item) !== '') $out[] = trim($item);
+    }
+    return array_values(array_unique($out));
+}
+
+/**
+ * 1問分の回答を lib/questions.php の定義で検証する。
+ * 戻り値：[保存する文字列, エラー文言（無ければ null）]
+ */
+function validate_question(array $q, $raw): array {
+    if ($q['type'] === 'single') {
+        if ($raw === '') return ['', '1つ選択してください'];
+        if (!in_array($raw, $q['options'], true)) return ['', '選択内容が正しくありません。選び直してください'];
+        return [$raw, null];
+    }
+
+    // multi / max2
+    if (count($raw) === 0) return ['', '1つ以上選択してください'];
+    foreach ($raw as $item) {
+        if (!in_array($item, $q['options'], true)) return ['', '選択内容が正しくありません。選び直してください'];
+    }
+    if ($q['type'] === 'max2' && count($raw) > 2) return ['', '2つまで選択してください'];
+    foreach ($q['exclusive'] as $ex) {
+        if (in_array($ex, $raw, true) && count($raw) > 1) {
+            return ['', '「' . $ex . '」は他の選択肢と同時に選べません'];
+        }
+    }
+    // 保存順は定義の選択肢順にそろえる
+    $ordered = array_values(array_filter($q['options'], fn($o) => in_array($o, $raw, true)));
+    return [implode('、', $ordered), null];
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -103,7 +154,6 @@ if ($method === 'POST' && $step === 'basic') {
     }
 
     $_SESSION['response_id'] = $responseId;
-
     redirect_to('survey.php');
 }
 
@@ -118,102 +168,162 @@ if ($method === 'POST' && !csrf_verify($_POST['csrf_token'] ?? null)) {
     redirect_to('index.php');
 }
 
-$record = load_basic_record();
-$errors = [];
-$posted = ($method === 'POST');
+$record      = load_basic_record();
+$posted      = ($method === 'POST');
+$stepErrors  = [];   // ステップID => エラー文言（経路順に入る）
+$globalError = '';
+
+// 再表示用の入力値（設問ID => 文字列 or 配列）
+$old = ['respondent_type' => '', 'staff_name' => '', 'staff_memo' => ''];
+foreach ($QUESTIONS as $qid => $q) {
+    $old[$qid] = ($q['type'] === 'single') ? '' : [];
+}
 
 if ($posted) {
-    // --- Q1 ---
-    $q1       = trim($_POST['q1']       ?? '');
-    $q1_other = trim($_POST['q1_other'] ?? '');
-    $q1_stored = ($q1 === 'その他' && $q1_other !== '') ? 'その他：' . $q1_other : $q1;
-
-    // --- Q2（単一選択） ---
-    $q2       = trim($_POST['q2']       ?? '');
-    $q2_other = trim($_POST['q2_other'] ?? '');
-    $q2_stored = ($q2 === 'その他' && $q2_other !== '') ? 'その他：' . $q2_other : $q2;
-
-    // --- Q3（複数選択） ---
-    $q3_selected = isset($_POST['q3']) && is_array($_POST['q3']) ? $_POST['q3'] : [];
-    $q3_selected = array_map('trim', $q3_selected);
-    $q3_other    = trim($_POST['q3_other'] ?? '');
-    $q3_labels   = array_filter($q3_selected, fn($v) => $v !== 'その他');
-    if (in_array('その他', $q3_selected, true) && $q3_other !== '') {
-        $q3_labels[] = 'その他：' . $q3_other;
+    $old['respondent_type'] = posted_single('respondent_type');
+    foreach ($QUESTIONS as $qid => $q) {
+        $old[$qid] = ($q['type'] === 'single') ? posted_single($qid) : posted_multi($qid);
     }
-    $q3_stored = implode('、', $q3_labels);
+    $old['staff_name'] = posted_single('staff_name');
+    $old['staff_memo'] = posted_single('staff_memo');
 
-    // --- Q4（自由記述・任意） ---
-    $q4 = trim($_POST['q4'] ?? '');
+    $rt = $old['respondent_type'];
+    if (!array_key_exists($rt, $RESPONDENT_TYPES)) {
+        $stepErrors['type'] = '1つ選択してください';
+        $rt = '';
+    }
 
-    // --- スタッフ用 ---
-    $staff_name = trim($_POST['staff_name'] ?? '');
-    $staff_memo = trim($_POST['staff_memo'] ?? '');
+    // 経路はサーバー側で決める（クライアントから送られた経路は使わない）
+    $route      = '';
+    $endedEarly = false;
+    if ($rt === 'doctor') {
+        $route = in_array($old['d4'], $D4_TOP2_OPTIONS, true) ? 'top2' : 'bottom2';
+    } elseif ($rt === 'other') {
+        $endedEarly = ($old['n2'] === $N2_END_OPTION);
+    }
 
-    // --- バリデーション ---
-    if ($q1 === '')         $errors[] = 'Q1を選択してください';
-    if ($q1 === 'その他' && $q1_other === '') $errors[] = 'Q1「その他」の内容を入力してください';
-    if ($q2 === '')         $errors[] = 'Q2を選択してください';
-    if ($q2 === 'その他' && $q2_other === '') $errors[] = 'Q2「その他」の内容を入力してください';
-    if (in_array('その他', $q3_selected, true) && $q3_other === '') $errors[] = 'Q3「その他」の内容を入力してください';
+    // 経路外の設問は送られてきても空として保存する
+    $save = array_fill_keys(array_keys($QUESTIONS), '');
+    foreach (question_path($rt, $route, $endedEarly) as $qid) {
+        [$value, $err] = validate_question($QUESTIONS[$qid], $old[$qid]);
+        if ($err !== null) {
+            $stepErrors[$qid] = $err;
+        } else {
+            $save[$qid] = mb_substr($value, 0, 1000);
+        }
+    }
 
-    // --- DB更新（基本情報で作成した既存レコードを UPDATE。新規INSERTはしない） ---
-    if (empty($errors)) {
+    if (empty($stepErrors)) {
         try {
+            $sets = [];
+            $params = [];
+            foreach ($save as $qid => $value) {
+                $sets[] = "{$qid} = :{$qid}"; // 設問IDは lib/questions.php の定義（固定値）のみ
+                $params[":{$qid}"] = $value;
+            }
             $pdo  = getDb();
             $stmt = $pdo->prepare("
                 UPDATE surveys SET
-                    q1 = :q1, q2 = :q2, q3 = :q3, q3_other = :q3_other, q4 = :q4,
+                    respondent_type = :respondent_type, route = :route, ended_early = :ended_early,
+                    " . implode(', ', $sets) . ",
                     staff_name = :staff_name, staff_memo = :staff_memo,
                     status = 'completed', completed_at = :completed_at
                 WHERE id = :id AND status = 'basic'
             ");
-            $stmt->execute([
-                ':q1'           => mb_substr($q1_stored, 0, 100),
-                ':q2'           => mb_substr($q2_stored, 0, 100),
-                ':q3'           => mb_substr($q3_stored, 0, 300),
-                ':q3_other'     => mb_substr($q3_other, 0, 200),
-                ':q4'           => mb_substr($q4, 0, 1000),
-                ':staff_name'   => encrypt_data(mb_substr($staff_name, 0, 100)),
-                ':staff_memo'   => encrypt_data(mb_substr($staff_memo, 0, 1000)),
-                ':completed_at' => date('Y-m-d H:i:s'),
-                ':id'           => (int)$record['id'],
+            $stmt->execute($params + [
+                ':respondent_type' => $rt,
+                ':route'           => $route,
+                ':ended_early'     => $endedEarly ? 1 : 0,
+                ':staff_name'      => encrypt_data(mb_substr($old['staff_name'], 0, 100)),
+                ':staff_memo'      => encrypt_data(mb_substr($old['staff_memo'], 0, 1000)),
+                ':completed_at'    => date('Y-m-d H:i:s'),
+                ':id'              => (int)$record['id'],
             ]);
 
             unset($_SESSION['response_id']);
+            $_SESSION['thanks_ended_early'] = $endedEarly; // thankyou.php で1回だけ読む
             redirect_to('thankyou.php');
         } catch (Exception $e) {
-            $errors[] = 'データの保存に失敗しました。もう一度お試しください。';
+            $globalError = 'データの保存に失敗しました。もう一度お試しください。';
         }
     }
 }
 
-// 再表示用にPOST値を保持
-if ($posted) {
-    $v = [
-        'q1'         => $q1,
-        'q1_other'   => htmlspecialchars($q1_other, ENT_QUOTES, 'UTF-8'),
-        'q2'         => $q2,
-        'q2_other'   => htmlspecialchars($q2_other, ENT_QUOTES, 'UTF-8'),
-        'q3'         => $q3_selected,
-        'q3_other'   => htmlspecialchars($q3_other, ENT_QUOTES, 'UTF-8'),
-        'q4'         => htmlspecialchars($q4, ENT_QUOTES, 'UTF-8'),
-        'staff_name' => htmlspecialchars($staff_name, ENT_QUOTES, 'UTF-8'),
-        'staff_memo' => htmlspecialchars($staff_memo, ENT_QUOTES, 'UTF-8'),
-    ];
-} else {
-    $v = array_fill_keys(['q1','q1_other','q2','q2_other','q3_other','q4','staff_name','staff_memo'], '');
-    $v['q3'] = [];
+// エラー時は最初にエラーが出たステップを開く（保存失敗時は最後のステップ）
+$initialStep = '';
+if ($stepErrors) {
+    $initialStep = (string)array_key_first($stepErrors);
+} elseif ($globalError !== '') {
+    $initialStep = '__last__';
 }
 
-function checked_radio(string $name, string $val, array $v): string {
-    return ($v[$name] === $val) ? ' checked' : '';
+function is_checked(string $qid, string $val, array $old): string {
+    $v = $old[$qid] ?? '';
+    $hit = is_array($v) ? in_array($val, $v, true) : ($v === $val);
+    return $hit ? ' checked' : '';
 }
-function checked_checkbox(string $val, array $selected): string {
-    return in_array($val, $selected, true) ? ' checked' : '';
+
+/**
+ * 設問1ステップ分の HTML
+ */
+function render_question_step(string $qid, array $q, string $badge, array $old, array $stepErrors): void {
+    $isSingle = ($q['type'] === 'single');
+    $listCls  = $isSingle ? 'radio-list' : 'checkbox-list';
+    $itemCls  = $isSingle ? 'radio-item' : 'checkbox-item';
+    $labelCls = $isSingle ? 'radio-label' : 'checkbox-label';
+    $inputType = $isSingle ? 'radio' : 'checkbox';
+    $inputName = $isSingle ? $qid : $qid . '[]';
+    $err = $stepErrors[$qid] ?? '';
+    ?>
+    <section class="step" data-step="<?= h($qid) ?>" hidden>
+        <div class="form-card question-card">
+            <div class="form-card-title">
+                <span class="section-badge"><?= h($badge) ?></span><?= h($q['text']) ?><span class="q-suffix"><?= h(question_suffix($q['type'])) ?></span>
+            </div>
+            <div class="<?= $listCls ?>" data-qtype="<?= h($q['type']) ?>">
+                <?php foreach ($q['options'] as $opt): ?>
+                <label class="<?= $itemCls ?>">
+                    <input type="<?= $inputType ?>" name="<?= h($inputName) ?>" value="<?= h($opt) ?>"<?= in_array($opt, $q['exclusive'], true) ? ' data-exclusive="1"' : '' ?><?= is_checked($qid, $opt, $old) ?>>
+                    <span class="<?= $labelCls ?>"><?= h($opt) ?></span>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <p class="step-error" role="alert"<?= $err === '' ? ' hidden' : '' ?>><?= h($err) ?></p>
+        </div>
+    </section>
+    <?php
 }
-function h(string $s): string {
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
+/**
+ * スライド表示1ステップ分の HTML（画像が空ならプレースホルダー）
+ */
+function render_slide_step(string $stepId, string $title, string $altPrefix, array $slides, string $placeholder): void {
+    ?>
+    <section class="step step-slide" data-step="<?= h($stepId) ?>" hidden>
+        <div class="form-card slide-card">
+            <div class="form-card-title"><?= h($title) ?></div>
+            <?php if (empty($slides)): ?>
+            <div class="slide-placeholder"><span><?= h($placeholder) ?></span></div>
+            <?php else: ?>
+            <div class="carousel" data-carousel>
+                <div class="carousel-viewport" tabindex="0" aria-label="<?= h($title) ?>（左右にスワイプで切り替え）">
+                    <?php foreach ($slides as $i => $src): ?>
+                    <div class="carousel-slide">
+                        <img src="<?= h($src) ?>" alt="<?= h($altPrefix . ' ' . ($i + 1)) ?>"<?= $i > 0 ? ' loading="lazy"' : '' ?> data-zoomable>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php if (count($slides) > 1): ?>
+                <button type="button" class="carousel-btn carousel-prev" aria-label="前のスライド">&#8249;</button>
+                <button type="button" class="carousel-btn carousel-next" aria-label="次のスライド">&#8250;</button>
+                <?php endif; ?>
+                <div class="carousel-counter" aria-live="polite"><span class="carousel-current">1</span> / <?= count($slides) ?></div>
+            </div>
+            <p class="slide-hint">画像をタップすると拡大表示します</p>
+            <?php endif; ?>
+        </div>
+    </section>
+    <?php
 }
 ?>
 <!DOCTYPE html>
@@ -221,7 +331,7 @@ function h(string $s): string {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>展示ブースアンケート | アレクシオンファーマ合同会社</title>
+    <title>IgG4関連疾患に関するアンケート | 田辺ファーマ株式会社</title>
     <link rel="stylesheet" href="css/style.css?v=20261007b">
 </head>
 <body>
@@ -233,146 +343,112 @@ function h(string $s): string {
         <div class="intro-logo">
             <img src="images/tanabe_logo.png" alt="田辺ファーマ株式会社">
         </div>
-        <p class="intro-company">アレクシオンファーマ合同会社</p>
-        <h1 class="intro-page-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">展示ブースアンケート</h1>
+        <h1 class="intro-page-title" style="margin-bottom:0;padding-bottom:0;border-bottom:none;">IgG4関連疾患に関するアンケート</h1>
     </div>
 
-    <?php if (!empty($errors)): ?>
-    <div class="error-msg" style="margin-bottom:20px;">
-        <?= h($errors[0]) ?>
-    </div>
+    <?php if ($globalError !== ''): ?>
+    <div class="error-msg" style="margin-bottom:20px;"><?= h($globalError) ?></div>
     <?php endif; ?>
 
-    <!-- ========== 基本情報（確認表示・読み取り専用） ========== -->
-    <div class="form-card">
-        <div class="form-card-title">基本情報</div>
-        <dl class="basic-summary">
-            <dt>ご芳名</dt>
-            <dd><?= h(decrypt_data((string)$record['name'])) ?></dd>
-            <dt>ご所属</dt>
-            <dd><?= h(decrypt_data((string)$record['facility'])) ?></dd>
-            <dt>都道府県</dt>
-            <dd><?= h((string)$record['prefecture']) ?></dd>
-        </dl>
-    </div>
-
-    <form id="surveyForm" method="post" action="survey.php">
+    <form id="surveyForm" class="stepper" method="post" action="survey.php"
+          data-d4-top2="<?= h(json_encode($D4_TOP2_OPTIONS, JSON_UNESCAPED_UNICODE)) ?>"
+          data-n2-end="<?= h($N2_END_OPTION) ?>"
+          data-initial-step="<?= h($initialStep) ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="answer">
 
-        <!-- ========== Q1 ========== -->
-        <div class="form-card">
-            <div class="form-card-title">
-                <span class="section-badge">Q1</span>本ブースの感想をお聞かせください。<span class="required-mark">※</span>
-            </div>
-            <div class="radio-list">
-                <?php
-                $q1_options = ['大変満足した', '満足した', 'どちらともいえない', 'やや不満だった', '不満だった'];
-                foreach ($q1_options as $opt):
-                ?>
-                <label class="radio-item">
-                    <input type="radio" name="q1" value="<?= h($opt) ?>"<?= checked_radio('q1', $opt, $v) ?>>
-                    <span class="radio-label"><?= h($opt) ?></span>
-                </label>
-                <?php endforeach; ?>
-                <label class="radio-item">
-                    <input type="radio" name="q1" value="その他" id="q1_other_check"<?= checked_radio('q1', 'その他', $v) ?>>
-                    <span class="radio-label">その他</span>
-                </label>
-            </div>
-            <div class="other-input-container<?= ($v['q1'] === 'その他') ? ' visible' : '' ?>" id="q1_other_container">
-                <input type="text" name="q1_other" class="other-input"
-                       value="<?= $v['q1_other'] ?>" placeholder="具体的にご記入ください"
-                       style="min-height:48px;">
-            </div>
+        <!-- 進捗バー -->
+        <div class="progress" aria-hidden="true">
+            <div class="progress-track"><div class="progress-fill"></div></div>
+            <span class="progress-text"></span>
         </div>
 
-        <!-- ========== Q2 ========== -->
-        <div class="form-card">
-            <div class="form-card-title">
-                <span class="section-badge">Q2</span>本ブースを知ったきっかけを教えてください。<span class="required-mark">※</span>
+        <!-- ========== 職種選択（全員） ========== -->
+        <section class="step" data-step="type" hidden>
+            <!-- 基本情報（確認表示・読み取り専用）：最初のステップにだけ表示 -->
+            <div class="form-card">
+                <div class="form-card-title">基本情報</div>
+                <dl class="basic-summary">
+                    <dt>ご芳名</dt>
+                    <dd><?= h(decrypt_data((string)$record['name'])) ?></dd>
+                    <dt>ご所属</dt>
+                    <dd><?= h(decrypt_data((string)$record['facility'])) ?></dd>
+                    <dt>都道府県</dt>
+                    <dd><?= h((string)$record['prefecture']) ?></dd>
+                </dl>
             </div>
-            <div class="radio-list">
-                <?php
-                $q2_options = ['Webサイト', 'SNS', '知人の紹介', '会場で見かけて'];
-                foreach ($q2_options as $opt):
-                ?>
-                <label class="radio-item">
-                    <input type="radio" name="q2" value="<?= h($opt) ?>"<?= checked_radio('q2', $opt, $v) ?>>
-                    <span class="radio-label"><?= h($opt) ?></span>
-                </label>
-                <?php endforeach; ?>
-                <label class="radio-item">
-                    <input type="radio" name="q2" value="その他" id="q2_other_check"<?= checked_radio('q2', 'その他', $v) ?>>
-                    <span class="radio-label">その他</span>
-                </label>
+
+            <div class="form-card question-card">
+                <div class="form-card-title"><?= h($RESPONDENT_TYPE_QUESTION) ?></div>
+                <div class="radio-list" data-qtype="single">
+                    <?php foreach ($RESPONDENT_TYPES as $val => $label): ?>
+                    <label class="radio-item">
+                        <input type="radio" name="respondent_type" value="<?= h($val) ?>"<?= $old['respondent_type'] === $val ? ' checked' : '' ?>>
+                        <span class="radio-label"><?= h($label) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+                <p class="step-error" role="alert"<?= isset($stepErrors['type']) ? '' : ' hidden' ?>><?= h($stepErrors['type'] ?? '') ?></p>
             </div>
-            <div class="other-input-container<?= ($v['q2'] === 'その他') ? ' visible' : '' ?>" id="q2_other_container">
-                <input type="text" name="q2_other" class="other-input"
-                       value="<?= $v['q2_other'] ?>" placeholder="具体的にご記入ください"
-                       style="min-height:48px;">
-            </div>
+        </section>
+
+        <!-- ========== 医師向け ========== -->
+        <?php
+        $n = 0;
+        foreach ($QUESTIONS as $qid => $q) {
+            if ($q['group'] !== 'doctor') continue;
+            $n++;
+            render_question_step($qid, $q, 'Q' . $n, $old, $stepErrors);
+            if ($qid === 'd4') {
+                // route=bottom2 のときだけ通る
+                render_slide_step('s_kei', 'ステロイド治療の課題', 'ステロイド治療の課題スライド', $SLIDES_KEIHATSU,
+                                  'ステロイド治療による問題点 啓発スライド（準備中）');
+            }
+            if ($qid === 'd5') {
+                // top2 は D5 の後、bottom2 は啓発スライドの後に通る
+                render_slide_step('s_mit', 'MITIGATE試験のご紹介', 'MITIGATE試験スライド', $SLIDES_MITIGATE, '');
+            }
+        }
+        ?>
+
+        <!-- ========== 医師以外の医療関係者向け ========== -->
+        <?php
+        $n = 0;
+        foreach ($QUESTIONS as $qid => $q) {
+            if ($q['group'] !== 'other') continue;
+            $n++;
+            render_question_step($qid, $q, 'Q' . $n, $old, $stepErrors);
+        }
+        ?>
+
+        <!-- ========== 戻る／次へ ========== -->
+        <div class="step-nav">
+            <button type="button" class="btn-back">戻る</button>
+            <button type="button" class="btn-next">次へ</button>
         </div>
 
-        <!-- ========== Q3 ========== -->
-        <div class="form-card">
-            <div class="form-card-title">
-                <span class="section-badge">Q3</span>ご興味のある分野を教えてください。（複数選択可）
-            </div>
-            <div class="checkbox-list">
-                <?php
-                $q3_options = ['新製品情報', '導入事例', '価格・費用', 'サポート体制'];
-                foreach ($q3_options as $opt):
-                ?>
-                <label class="checkbox-item">
-                    <input type="checkbox" name="q3[]" value="<?= h($opt) ?>"<?= checked_checkbox($opt, $v['q3']) ?>>
-                    <span class="checkbox-label"><?= h($opt) ?></span>
-                </label>
-                <?php endforeach; ?>
-                <label class="checkbox-item">
-                    <input type="checkbox" name="q3[]" value="その他" id="q3_other_check"<?= checked_checkbox('その他', $v['q3']) ?>>
-                    <span class="checkbox-label">その他</span>
-                </label>
-            </div>
-            <div class="other-input-container<?= in_array('その他', $v['q3'], true) ? ' visible' : '' ?>" id="q3_other_container">
-                <input type="text" name="q3_other" class="other-input"
-                       value="<?= $v['q3_other'] ?>" placeholder="具体的にご記入ください"
-                       style="min-height:48px;">
-            </div>
-        </div>
-
-        <!-- ========== Q4 ========== -->
-        <div class="form-card">
-            <div class="form-card-title">
-                <span class="section-badge">Q4</span>ご意見・ご要望がございましたらご記入ください。（任意）
-            </div>
-            <div class="other-input-container visible">
-                <textarea name="q4" class="other-input" rows="4"
-                          placeholder="ご自由にご記入ください"><?= $v['q4'] ?></textarea>
-            </div>
-        </div>
-
-        <!-- ========== 送信ボタン ========== -->
-        <div class="submit-area">
-            <button type="submit" class="btn-submit">送信する</button>
-        </div>
-
-        <!-- ========== スタッフ用入力欄 ========== -->
-        <div class="staff-section">
-            <p class="staff-section-title">アレクシオンファーマ合同会社使用欄</p>
+        <!-- ========== スタッフ用入力欄（最後のステップでのみ表示） ========== -->
+        <div class="staff-section" hidden>
+            <p class="staff-section-title">田辺ファーマ株式会社使用欄</p>
             <div class="staff-form-group">
                 <label for="staff_name">アンケート実施者</label>
                 <input type="text" id="staff_name" name="staff_name"
-                       value="<?= $v['staff_name'] ?>" placeholder="担当者名">
+                       value="<?= h($old['staff_name']) ?>" placeholder="担当者名">
             </div>
             <div class="staff-form-group">
                 <label for="staff_memo">メモ</label>
                 <textarea id="staff_memo" name="staff_memo" rows="3"
-                          placeholder="メモを入力してください"><?= $v['staff_memo'] ?></textarea>
+                          placeholder="メモを入力してください"><?= h($old['staff_memo']) ?></textarea>
             </div>
         </div>
 
     </form>
+</div>
+
+<!-- スライドの全画面表示 -->
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="スライドの拡大表示">
+    <button type="button" class="lightbox-close" aria-label="閉じる">&times;</button>
+    <img class="lightbox-img" alt="">
 </div>
 
 <script src="js/app.js?v=20261007a"></script>
