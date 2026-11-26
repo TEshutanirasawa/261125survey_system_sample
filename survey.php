@@ -298,7 +298,9 @@ function render_question_step(string $qid, array $q, string $badge, array $old, 
 /**
  * スライド表示1ステップ分の HTML（画像が空ならプレースホルダー）
  */
-function render_slide_step(string $stepId, string $title, string $altPrefix, array $slides, string $placeholder): void {
+function render_slide_step(string $stepId, string $title, string $altPrefix, array $slides, string $placeholder, bool $requireAll): void {
+    // 全閲覧必須は、スライドが2枚以上あるときだけ（1枚だけ・プレースホルダーはロックしない）
+    $lock = $requireAll && count($slides) > 1;
     ?>
     <section class="step step-slide" data-step="<?= h($stepId) ?>" hidden>
         <div class="form-card slide-card">
@@ -306,7 +308,7 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
             <?php if (empty($slides)): ?>
             <div class="slide-placeholder"><span><?= h($placeholder) ?></span></div>
             <?php else: ?>
-            <div class="carousel" data-carousel>
+            <div class="carousel" data-carousel data-step-id="<?= h($stepId) ?>" data-slide-count="<?= count($slides) ?>"<?= $lock ? ' data-require-all="1"' : '' ?>>
                 <div class="carousel-viewport" tabindex="0" aria-label="<?= h($title) ?>（左右にスワイプで切り替え）">
                     <?php foreach ($slides as $i => $src): ?>
                     <div class="carousel-slide">
@@ -321,6 +323,9 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
                 <div class="carousel-counter" aria-live="polite"><span class="carousel-current">1</span> / <?= count($slides) ?></div>
             </div>
             <p class="slide-hint">画像をタップすると拡大表示します</p>
+            <?php if ($lock): ?>
+            <p class="slide-lock-hint" aria-live="polite" hidden></p>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
     </section>
@@ -396,11 +401,11 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
             if ($qid === 'd4') {
                 // route=bottom2 のときだけ通る
                 render_slide_step('s_kei', 'ステロイド治療の課題', 'ステロイド治療の課題スライド', $SLIDES_KEIHATSU,
-                                  'ステロイド治療による問題点 啓発スライド（準備中）');
+                                  'ステロイド治療による問題点 啓発スライド（準備中）', $SLIDES_REQUIRE_ALL['s_kei'] ?? false);
             }
             if ($qid === 'd5') {
                 // top2 は D5 の後、bottom2 は啓発スライドの後に通る
-                render_slide_step('s_mit', 'MITIGATE試験のご紹介', 'MITIGATE試験スライド', $SLIDES_MITIGATE, '');
+                render_slide_step('s_mit', 'MITIGATE試験のご紹介', 'MITIGATE試験スライド', $SLIDES_MITIGATE, '', $SLIDES_REQUIRE_ALL['s_mit'] ?? false);
             }
         }
         ?>
