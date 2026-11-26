@@ -786,6 +786,20 @@ body {
     cursor: not-allowed;
 }
 
+/* 「次へ」が押せない（スライド未閲覧のロック中・送信中）：はっきりグレーにする */
+.btn-next:disabled,
+.btn-next:disabled:hover {
+    opacity: 1;
+    background: #E3E8EA;
+    color: #5F6B70;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.btn-next:disabled:active {
+    transform: none;
+}
+
 /* ============================================================
    スライド（カルーセル・プレースホルダー・全画面表示）
    ============================================================ */
@@ -878,6 +892,30 @@ body {
     font-size: 0.85rem;
     color: var(--text-muted);
     margin-top: 2px;
+}
+
+/* 全閲覧必須のスライド：ロック中の案内文（「戻る／次へ」のすぐ上に見えるよう、カードの下側の余白を詰める） */
+.slide-lock-hint {
+    text-align: center;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.5;
+    margin-top: 10px;
+}
+
+.slide-lock-hint::before {
+    content: "ⓘ";
+    margin-right: 0.3em;
+}
+
+.slide-card:has(.slide-lock-hint:not([hidden])) {
+    padding-bottom: 16px;
+    margin-bottom: 0;
+}
+
+.survey-wrapper.is-slide .step-nav {
+    margin-top: 16px;
 }
 
 .slide-placeholder {
