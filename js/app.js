@@ -410,6 +410,71 @@
     }
 
     // ============================================================
+    // スライドの閲覧時間（スライド1枚ごとの表示時間をミリ秒で積算し、送信時にまとめて送る）
+    //   数えるのは「そのスライドのステップが表示中」「カルーセルで表示中のスライド」「タブが表示状態」の間だけ。
+    //   全画面表示（ライトボックス）中はカルーセルの位置が変わらないため、開いた元のスライドの時間になる。
+    // ============================================================
+    var SlideTimer = (function () {
+        var MAX_MS = 600000;   // 1枚あたりの上限（サーバー側の SLIDE_VIEW_MAX_MS と同じ値）
+        var data   = {};       // ステップID => [ms, ms, …]
+        var shown  = null;     // 表示中のスライドのステップのカルーセル要素
+        var active = null;     // 計測中 { stepId, idx, start }
+
+        function now() {
+            return (window.performance && performance.now) ? performance.now() : Date.now();
+        }
+
+        function register(c) {
+            var id = c.getAttribute('data-step-id') || '';
+            var n  = parseInt(c.getAttribute('data-slide-count'), 10) || 0;
+            if (!id || n <= 0 || data[id]) return;
+            data[id] = [];
+            for (var i = 0; i < n; i++) data[id].push(0);
+        }
+
+        function stop() {
+            if (!active) return;
+            var arr = data[active.stepId];
+            if (arr && active.idx >= 0 && active.idx < arr.length) {
+                arr[active.idx] = Math.min(MAX_MS, arr[active.idx] + Math.max(0, now() - active.start));
+            }
+            active = null;
+        }
+
+        // 今の状態で計測すべきスライドに合わせて、計測を開始・停止・切り替える
+        function sync() {
+            var want = null;
+            if (shown && document.visibilityState === 'visible' && shown._currentIndex) {
+                var id = shown.getAttribute('data-step-id') || '';
+                if (data[id]) want = { stepId: id, idx: shown._currentIndex() };
+            }
+            if (active && want && active.stepId === want.stepId && active.idx === want.idx) return;
+            stop();
+            if (want) active = { stepId: want.stepId, idx: want.idx, start: now() };
+        }
+
+        function setShown(c) {
+            shown = (c && c.hasAttribute('data-step-id')) ? c : null;
+            sync();
+        }
+
+        // 送信直前に呼ぶ：計測中の分を締めて、指定のステップ（経路上のもの）だけを JSON にする
+        function serialize(stepIds) {
+            stop();
+            var out = {};
+            stepIds.forEach(function (id) {
+                if (data[id]) out[id] = data[id].map(function (ms) { return Math.round(ms); });
+            });
+            sync();
+            return JSON.stringify(out);
+        }
+
+        document.addEventListener('visibilitychange', sync);
+
+        return { register: register, setShown: setShown, sync: sync, serialize: serialize };
+    })();
+
+    // ============================================================
     // アンケート本体（survey.php）：1問1画面のステップ表示・分岐
     // ============================================================
     function setupStepper() {
@@ -523,6 +588,8 @@
             // スライドのステップを表示したら、カルーセルに知らせる（1枚目を閲覧済みにする）
             var shownCarousel = steps[current].querySelector('[data-carousel]');
             if (shownCarousel && shownCarousel._onShown) shownCarousel._onShown();
+            // 閲覧時間：スライドのステップを表示したら計測開始、離れたら停止
+            SlideTimer.setShown(shownCarousel);
 
             var locked = isLocked(current);
             btnNext.disabled = submitting || locked;
@@ -572,6 +639,17 @@
             btnNext.disabled = true;
             btnBack.disabled = true;
             btnNext.textContent = '送信中...';
+            // 閲覧時間（経路上のスライドのステップだけ）。失敗しても送信は止めない
+            var timesInput = form.querySelector('input[name="slide_times"]');
+            if (timesInput) {
+                try {
+                    timesInput.value = SlideTimer.serialize(path.filter(function (id) {
+                        return steps[id] && steps[id].classList.contains('step-slide');
+                    }));
+                } catch (err) {
+                    timesInput.value = '';
+                }
+            }
             form.submit();
         }
 
@@ -696,7 +774,11 @@
             function settle() {
                 // ステップが hidden の間は幅が 0 で位置を判定できないため記録しない
                 if (viewport.clientWidth === 0) return;
-                settled = index();
+                var i = index();
+                if (i !== settled) {
+                    settled = i;
+                    SlideTimer.sync();   // 閲覧時間：前のスライドを締めて、新しいスライドで開始
+                }
                 markViewed(settled);
             }
 
@@ -707,6 +789,7 @@
             }
 
             if (requireAll) c.setAttribute('data-viewed-count', '0');
+            SlideTimer.register(c);
 
             // ステッパーから呼ぶ：スライドのステップが表示された（1枚目はこの時点で閲覧済み）
             c._onShown = function () {

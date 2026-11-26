@@ -67,7 +67,24 @@ $rows    = [];
 $summary = ['completed' => 0, 'basic' => 0, 'doctor' => 0, 'other' => 0, 'top2' => 0, 'bottom2' => 0, 'ended_early' => 0];
 $stats   = [];   // 設問ID => ['answered' => 母数, 'counts' => [選択肢 => 件数]]
 $prefStats = [];
+$slideStats = []; // ステップID => スライド閲覧時間の集計
 $dbError = '';
+
+// 閲覧時間（ミリ秒の配列）の平均・中央値。件数0なら null
+function ms_mean(array $ms): ?float {
+    return $ms ? array_sum($ms) / count($ms) : null;
+}
+function ms_median(array $ms): ?float {
+    if (!$ms) return null;
+    sort($ms, SORT_NUMERIC);
+    $n = count($ms);
+    $mid = intdiv($n, 2);
+    return ($n % 2) ? (float)$ms[$mid] : ($ms[$mid - 1] + $ms[$mid]) / 2;
+}
+// ミリ秒 → 秒（小数1桁）。null は '-'
+function sec1(?float $ms): string {
+    return $ms === null ? '-' : number_format($ms / 1000, 1);
+}
 
 if ($isLoggedIn) {
     try {
@@ -97,6 +114,48 @@ if ($isLoggedIn) {
             $stats[$qid] = ['answered' => $answered, 'counts' => $counts];
         }
 
+        // スライド閲覧時間（回答完了のみ）：ステップID => [response_id => ['route' => 経路, 'ms' => [スライド番号 => ミリ秒]]]
+        $svRows = $pdo->query("
+            SELECT v.response_id, v.step_id, v.slide_no, v.view_ms, s.route
+            FROM slide_views v JOIN surveys s ON s.id = v.response_id
+            WHERE s.status = 'completed'
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $svByStep = [];
+        foreach ($svRows as $sv) {
+            $sid = (string)$sv['step_id'];
+            $rid = (int)$sv['response_id'];
+            $svByStep[$sid][$rid]['route'] = (string)$sv['route'];
+            $svByStep[$sid][$rid]['ms'][(int)$sv['slide_no']] = (int)$sv['view_ms'];
+        }
+        foreach ($SLIDE_STEPS as $sid => $def) {
+            $n = count($def['slides']);
+            if ($n === 0) continue;
+            $resp = $svByStep[$sid] ?? [];
+            $slidesSt = [];
+            for ($no = 1; $no <= $n; $no++) {
+                $all = []; $byRoute = ['top2' => [], 'bottom2' => []];
+                foreach ($resp as $r) {
+                    $ms = $r['ms'][$no] ?? 0;
+                    $all[] = $ms;
+                    if (isset($byRoute[$r['route']])) $byRoute[$r['route']][] = $ms;
+                }
+                $slidesSt[$no] = [
+                    'viewers' => count(array_filter($all, fn($v) => $v > 0)),
+                    'mean'    => ms_mean($all),
+                    'top2'    => ms_mean($byRoute['top2']),
+                    'bottom2' => ms_mean($byRoute['bottom2']),
+                    'median'  => ms_median($all),
+                ];
+            }
+            $totals = array_map(fn($r) => array_sum($r['ms']), $resp);
+            $slideStats[$sid] = [
+                'respondents' => count($resp),
+                'slides'      => $slidesSt,
+                'total_mean'  => ms_mean(array_values($totals)),
+                'max_mean'    => max(array_map(fn($s) => $s['mean'] ?? 0, $slidesSt)),
+            ];
+        }
+
         // 都道府県（上位10）
         $prefStats = $pdo->query("SELECT prefecture, COUNT(*) as cnt FROM surveys WHERE status = 'completed' GROUP BY prefecture ORDER BY cnt DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -120,7 +179,20 @@ if ($isLoggedIn && $dbError === '' && isset($_GET['export']) && $_GET['export'] 
     foreach ($QUESTIONS as $q) $cols[] = $q['short'];
     $cols[] = '担当者';
     $cols[] = 'メモ';
+    // スライド閲覧時間の列（スライドの枚数は lib/questions.php の配列から決める）
+    $csvSlideSteps = array_filter($SLIDE_STEPS, fn($def) => count($def['slides']) > 0);
+    foreach ($csvSlideSteps as $def) {
+        for ($no = 1; $no <= count($def['slides']); $no++) $cols[] = $def['csv'] . $no . '秒';
+        $cols[] = $def['csv'] . '合計秒';
+    }
     echo implode(',', array_map($csv, $cols)) . "\r\n";
+
+    // response_id => ステップID => [スライド番号 => ミリ秒]
+    $svMap = [];
+    foreach ($pdo->query("SELECT response_id, step_id, slide_no, view_ms FROM slide_views")->fetchAll(PDO::FETCH_ASSOC) as $sv) {
+        $svMap[(int)$sv['response_id']][(string)$sv['step_id']][(int)$sv['slide_no']] = (int)$sv['view_ms'];
+    }
+    $sec = fn(int $ms) => number_format($ms / 1000, 1, '.', '');
 
     $exportRows = $pdo->query("SELECT * FROM surveys ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($exportRows as $r) {
@@ -137,6 +209,13 @@ if ($isLoggedIn && $dbError === '' && isset($_GET['export']) && $_GET['export'] 
         foreach ($QUESTIONS as $qid => $q) $line[] = $r[$qid] ?? '';
         $line[] = decrypt_data((string)($r['staff_name'] ?? ''));
         $line[] = decrypt_data((string)($r['staff_memo'] ?? ''));
+        foreach ($csvSlideSteps as $sid => $def) {
+            $rec = $svMap[(int)$r['id']][$sid] ?? null; // 記録がない回答（医師以外・旧データなど）は空欄
+            for ($no = 1; $no <= count($def['slides']); $no++) {
+                $line[] = $rec !== null ? $sec($rec[$no] ?? 0) : '';
+            }
+            $line[] = $rec !== null ? $sec(array_sum($rec)) : '';
+        }
         echo implode(',', array_map($csv, $line)) . "\r\n";
     }
     exit;
@@ -232,6 +311,14 @@ if ($isLoggedIn && $dbError === '' && isset($_GET['export']) && $_GET['export'] 
         .stat-bar { height: 100%; background: var(--brand-teal); border-radius: 4px; transition: width .4s; }
         .stat-cnt { font-size: .82em; font-weight: 700; color: var(--primary-dark); white-space: nowrap; text-align: right; }
         .stat-cnt small { font-weight: 400; color: var(--sub); }
+
+        /* ===== スライド閲覧時間 ===== */
+        .stats-grid-wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); }
+        .sv-table { width: 100%; }
+        .sv-table th.num, .sv-table td.num { text-align: right; }
+        .sv-table tbody td { vertical-align: middle; max-width: none; }
+        .sv-table tfoot td { padding: 10px 10px; font-size: .82em; border-top: 2px solid var(--brand-teal); color: var(--primary-dark); }
+        .sv-mean { display: grid; grid-template-columns: minmax(80px, 1fr) auto; align-items: center; gap: 8px; min-width: 160px; }
 
         /* ===== データテーブル ===== */
         .table-section { background: var(--surface); border-radius: 8px; padding: 20px 22px; box-shadow: 0 2px 8px rgba(var(--primary-rgb),.08); }
@@ -386,6 +473,59 @@ if ($isLoggedIn && $dbError === '' && isset($_GET['export']) && $_GET['export'] 
             <?php endforeach; ?>
         </div>
     </div>
+
+    <?php if ($slideStats): ?>
+    <h2 class="section-title">スライド閲覧時間</h2>
+    <div class="stats-grid stats-grid-wide">
+        <?php foreach ($slideStats as $sid => $ss): ?>
+        <div class="stat-card">
+            <h3><?= e($SLIDE_STEPS[$sid]['label']) ?></h3>
+            <p class="stat-meta">記録のある回答者 <?= $ss['respondents'] ?>人（平均・中央値の母数。表示されなかったスライドは0秒として含む）</p>
+            <?php if ($ss['respondents'] === 0): ?>
+            <p class="stat-meta">まだ記録がありません</p>
+            <?php else: ?>
+            <div class="table-wrap">
+                <table class="sv-table">
+                    <thead>
+                        <tr>
+                            <th>スライド</th>
+                            <th class="num">閲覧人数</th>
+                            <th>平均秒数（全体）</th>
+                            <th class="num">平均 top2</th>
+                            <th class="num">平均 bottom2</th>
+                            <th class="num">中央値</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($ss['slides'] as $no => $st): ?>
+                        <tr>
+                            <td><?= $no ?>枚目</td>
+                            <td class="num"><?= $st['viewers'] ?>人</td>
+                            <td>
+                                <div class="sv-mean">
+                                    <div class="stat-bar-wrap"><div class="stat-bar" style="width:<?= barWidth((int)round($st['mean'] ?? 0), (int)round($ss['max_mean'])) ?>%"></div></div>
+                                    <span class="stat-cnt"><?= sec1($st['mean']) ?>秒</span>
+                                </div>
+                            </td>
+                            <td class="num"><?= sec1($st['top2']) ?></td>
+                            <td class="num"><?= sec1($st['bottom2']) ?></td>
+                            <td class="num"><?= sec1($st['median']) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">1人あたりの合計（平均）</td>
+                            <td colspan="4"><strong><?= sec1($ss['total_mean']) ?>秒</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
     <!-- 回答一覧テーブル -->
     <div class="table-section">

@@ -228,6 +228,27 @@ $SLIDES_REQUIRE_ALL = [
     's_kei' => false,  // 啓発スライド：素材が届いた時点で判断する
 ];
 
+// 閲覧時間の記録・集計の対象（管理画面・CSV の表示順）
+//   label：管理画面の見出し／csv：CSV の列名の接頭辞（例：MIT1秒〜MIT7秒・MIT合計秒）
+// スライドが空のステップ（素材未着の啓発スライド）は記録も表示もしない。
+$SLIDE_STEPS = [
+    's_mit' => ['label' => 'MITIGATE試験スライド',         'csv' => 'MIT', 'slides' => $SLIDES_MITIGATE],
+    's_kei' => ['label' => 'ステロイド治療の課題 啓発スライド', 'csv' => 'KEI', 'slides' => $SLIDES_KEIHATSU],
+];
+
+// 閲覧時間の1枚あたりの上限（ミリ秒）。放置された端末で数値が膨らむのを防ぐ
+const SLIDE_VIEW_MAX_MS = 600000;
+
+/**
+ * 回答者区分・経路から、通るスライドのステップIDを返す（スライドが空のステップは含まない）
+ *   doctor/top2 : s_mit ／ doctor/bottom2 : s_kei s_mit ／ other : なし
+ */
+function slide_path(string $respondentType, string $route, array $slideSteps): array {
+    if ($respondentType !== 'doctor') return [];
+    $ids = ($route === 'bottom2') ? ['s_kei', 's_mit'] : ['s_mit'];
+    return array_values(array_filter($ids, fn($id) => !empty($slideSteps[$id]['slides'])));
+}
+
 /**
  * 形式に応じた設問文の後ろの注記
  */

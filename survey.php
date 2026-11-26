@@ -94,6 +94,30 @@ function validate_question(array $q, $raw): array {
     return [implode('、', $ordered), null];
 }
 
+/**
+ * 送信された閲覧時間（JSON：{"s_mit":[ms, …], …}）から、保存してよいものだけを取り出す。
+ *   $allowed：その回答者の経路上にあるスライドのステップID => スライド枚数
+ * 条件を満たさない部分は黙って捨てる（回答の保存は止めない）。
+ * 戻り値：ステップID => [スライド番号(1始まり) => ミリ秒]
+ */
+function parse_slide_times($raw, array $allowed): array {
+    if (!is_string($raw) || $raw === '' || strlen($raw) > 10000) return [];
+    $data = json_decode($raw, true);
+    if (!is_array($data)) return [];
+    $out = [];
+    foreach ($allowed as $stepId => $count) {
+        $list = $data[$stepId] ?? null;
+        if (!is_array($list) || count($list) !== $count || array_keys($list) !== range(0, $count - 1)) continue;
+        $vals = [];
+        foreach ($list as $i => $v) {
+            if (!is_int($v) && !(is_float($v) && is_finite($v))) { $vals = null; break; }
+            $vals[$i + 1] = (int)round(max(0, min(SLIDE_VIEW_MAX_MS, $v)));
+        }
+        if ($vals !== null) $out[$stepId] = $vals;
+    }
+    return $out;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $step   = $_POST['step'] ?? '';
 
@@ -215,6 +239,14 @@ if ($posted) {
     }
 
     if (empty($stepErrors)) {
+        // スライドの閲覧時間（経路上のスライドのステップだけ。医師以外は何も保存しない）
+        $allowedSlides = [];
+        foreach (slide_path($rt, $route, $SLIDE_STEPS) as $sid) {
+            $allowedSlides[$sid] = count($SLIDE_STEPS[$sid]['slides']);
+        }
+        $slideTimes = parse_slide_times($_POST['slide_times'] ?? '', $allowedSlides);
+
+        $pdo = null;
         try {
             $sets = [];
             $params = [];
@@ -223,6 +255,7 @@ if ($posted) {
                 $params[":{$qid}"] = $value;
             }
             $pdo  = getDb();
+            $pdo->beginTransaction();
             $stmt = $pdo->prepare("
                 UPDATE surveys SET
                     respondent_type = :respondent_type, route = :route, ended_early = :ended_early,
@@ -241,10 +274,44 @@ if ($posted) {
                 ':id'              => (int)$record['id'],
             ]);
 
+            // 回答を更新できたときだけ閲覧時間を保存する。失敗しても閲覧時間だけを諦め、回答はコミットする
+            if ($stmt->rowCount() === 1 && $slideTimes) {
+                try {
+                    $pdo->exec('SAVEPOINT slide_views');
+                    $ins = $pdo->prepare("
+                        INSERT OR REPLACE INTO slide_views (response_id, step_id, slide_no, view_ms)
+                        VALUES (:response_id, :step_id, :slide_no, :view_ms)
+                    ");
+                    foreach ($slideTimes as $sid => $vals) {
+                        foreach ($vals as $no => $ms) {
+                            $ins->execute([
+                                ':response_id' => (int)$record['id'],
+                                ':step_id'     => $sid,
+                                ':slide_no'    => $no,
+                                ':view_ms'     => $ms,
+                            ]);
+                        }
+                    }
+                    $pdo->exec('RELEASE SAVEPOINT slide_views');
+                } catch (Exception $e) {
+                    try {
+                        $pdo->exec('ROLLBACK TO SAVEPOINT slide_views');
+                        $pdo->exec('RELEASE SAVEPOINT slide_views');
+                    } catch (Exception $e2) {
+                        // 何もしない（回答のコミットを優先）
+                    }
+                }
+            }
+
+            $pdo->commit();
+
             unset($_SESSION['response_id']);
             $_SESSION['thanks_ended_early'] = $endedEarly; // thankyou.php で1回だけ読む
             redirect_to('thankyou.php');
         } catch (Exception $e) {
+            if ($pdo instanceof PDO && $pdo->inTransaction()) {
+                try { $pdo->rollBack(); } catch (Exception $e2) {}
+            }
             $globalError = 'データの保存に失敗しました。もう一度お試しください。';
         }
     }
@@ -355,6 +422,7 @@ function render_slide_step(string $stepId, string $title, string $altPrefix, arr
           data-initial-step="<?= h($initialStep) ?>">
         <?= csrf_field() ?>
         <input type="hidden" name="step" value="answer">
+        <input type="hidden" name="slide_times" value="">
 
         <!-- 進捗バー -->
         <div class="progress" aria-hidden="true">
