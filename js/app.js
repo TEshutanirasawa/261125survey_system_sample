@@ -499,7 +499,18 @@
             return false;
         }
 
+        // スライドを全部見るまで「次へ」を押せないステップか
+        function lockCarousel(id) {
+            return steps[id] ? steps[id].querySelector('[data-carousel][data-require-all="1"]') : null;
+        }
+        function isLocked(id) {
+            var c = lockCarousel(id);
+            return !!c && c.getAttribute('data-viewed-all') !== '1';
+        }
+
+        var rendering = false;
         function render(scroll) {
+            rendering = true;
             var path = computePath();
             var idx  = path.indexOf(current);
             if (idx === -1) { current = 'type'; idx = 0; }
@@ -508,6 +519,27 @@
             Object.keys(steps).forEach(function (id) {
                 steps[id].hidden = (id !== current);
             });
+
+            // スライドのステップを表示したら、カルーセルに知らせる（1枚目を閲覧済みにする）
+            var shownCarousel = steps[current].querySelector('[data-carousel]');
+            if (shownCarousel && shownCarousel._onShown) shownCarousel._onShown();
+
+            var locked = isLocked(current);
+            btnNext.disabled = submitting || locked;
+            btnNext.setAttribute('aria-disabled', btnNext.disabled ? 'true' : 'false');
+            var lockHint = steps[current].querySelector('.slide-lock-hint');
+            if (lockHint) {
+                if (locked) {
+                    var lc = lockCarousel(current);
+                    var total  = parseInt(lc.getAttribute('data-slide-count'), 10) || 0;
+                    var viewed = parseInt(lc.getAttribute('data-viewed-count'), 10) || 0;
+                    lockHint.textContent = 'すべてのスライドをご覧いただくと「次へ」に進めます（残り' + Math.max(0, total - viewed) + '枚）';
+                    lockHint.hidden = false;
+                } else {
+                    lockHint.hidden = true;
+                    lockHint.textContent = '';
+                }
+            }
 
             btnBack.hidden = (idx === 0);
             btnNext.textContent = isLast ? '送信する' : '次へ';
@@ -521,6 +553,7 @@
             if (wrapper) wrapper.classList.toggle('is-slide', steps[current].classList.contains('step-slide'));
 
             if (scroll) window.scrollTo(0, 0);
+            rendering = false;
         }
 
         function submitForm() {
@@ -544,6 +577,7 @@
 
         function goNext() {
             if (submitting) return;
+            if (isLocked(current)) return;   // Enterキー（form の submit）もここを通る
             if (!validateStep(current)) return;
             var path = computePath();
             var idx  = path.indexOf(current);
@@ -586,6 +620,14 @@
             render(false);
         });
 
+        // スライドの閲覧が進んだ・全部見終えた：残り枚数の案内と「次へ」のロックを更新
+        // （render() の中で1枚目を記録したときは、その render() 自身が続けて反映する）
+        function onSlidesViewed() {
+            if (!rendering) render(false);
+        }
+        form.addEventListener('slides:progress', onSlidesViewed);
+        form.addEventListener('slides:viewed', onSlidesViewed);
+
         // 初期表示：サーバー側エラー時はそのステップ（保存失敗時は最後のステップ）を開く
         var initial = form.getAttribute('data-initial-step') || '';
         if (initial === '__last__') {
@@ -593,6 +635,15 @@
             current = p0[p0.length - 1];
         } else if (initial && steps[initial]) {
             current = initial;
+        }
+        // 最初に開くステップより前にある全閲覧必須のスライドは、すでに見終えているので閲覧済みにする
+        if (initial) {
+            var p1 = computePath();
+            var curIdx = p1.indexOf(current);
+            for (var j = 0; j < curIdx; j++) {
+                var lcj = lockCarousel(p1[j]);
+                if (lcj && lcj._markAllViewed) lcj._markAllViewed();
+            }
         }
         render(false);
     }
@@ -625,15 +676,66 @@
                 viewport.scrollTo({ left: i * viewport.clientWidth, behavior: 'smooth' });
             }
 
+            // ---- 閲覧済みスライドの記録（data-require-all="1" のカルーセルのみ） ----
+            //   スクロールが止まった時点で表示されているスライドを閲覧済みにする（勢いよく通過したスライドは数えない）
+            var requireAll  = c.getAttribute('data-require-all') === '1';
+            var viewed      = {};
+            var viewedCount = 0;
+            var settled     = 0;   // スクロールが止まった時点の表示スライド番号（0始まり）
+
+            function markViewed(i) {
+                if (!requireAll || viewed[i]) return;
+                viewed[i] = true;
+                viewedCount++;
+                c.setAttribute('data-viewed-count', String(viewedCount));
+                var all = (viewedCount >= slides.length && c.getAttribute('data-viewed-all') !== '1');
+                if (all) c.setAttribute('data-viewed-all', '1');
+                c.dispatchEvent(new CustomEvent(all ? 'slides:viewed' : 'slides:progress', { bubbles: true }));
+            }
+
+            function settle() {
+                // ステップが hidden の間は幅が 0 で位置を判定できないため記録しない
+                if (viewport.clientWidth === 0) return;
+                settled = index();
+                markViewed(settled);
+            }
+
+            var settleTimer = null;
+            function scheduleSettle() {
+                if (settleTimer) clearTimeout(settleTimer);
+                settleTimer = setTimeout(function () { settleTimer = null; settle(); }, 150);
+            }
+
+            if (requireAll) c.setAttribute('data-viewed-count', '0');
+
+            // ステッパーから呼ぶ：スライドのステップが表示された（1枚目はこの時点で閲覧済み）
+            c._onShown = function () {
+                update();
+                settle();
+            };
+            // 現在表示中のスライド番号（スクロールが止まった時点の値）
+            c._currentIndex = function () { return settled; };
+            // 全スライドを閲覧済みにする（サーバー側エラーでの再表示用）
+            c._markAllViewed = function () {
+                for (var k = 0; k < slides.length; k++) markViewed(k);
+            };
+
             if (prev) prev.addEventListener('click', function () { goTo(index() - 1); });
             if (next) next.addEventListener('click', function () { goTo(index() + 1); });
 
             var ticking = false;
             viewport.addEventListener('scroll', function () {
+                scheduleSettle();
                 if (ticking) return;
                 ticking = true;
                 window.requestAnimationFrame(function () { ticking = false; update(); });
             }, { passive: true });
+            if ('onscrollend' in viewport) {
+                viewport.addEventListener('scrollend', function () {
+                    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+                    settle();
+                });
+            }
 
             viewport.addEventListener('keydown', function (e) {
                 if (e.key === 'ArrowLeft')  { e.preventDefault(); goTo(index() - 1); }
@@ -641,7 +743,7 @@
             });
 
             // 非表示ステップから表示に切り替わった・画面回転した場合も位置を合わせ直す
-            window.addEventListener('resize', update);
+            window.addEventListener('resize', function () { update(); scheduleSettle(); });
             update();
         });
     }
@@ -701,8 +803,8 @@
         initOcr();
         setupBasicFormSubmit();
         setupChoices(document);
+        setupCarousels();   // ステッパーの初回表示でカルーセルの関数（_onShown など）を使うため先に用意する
         setupStepper();
-        setupCarousels();
         setupLightbox();
         setupHaptic();
     }
