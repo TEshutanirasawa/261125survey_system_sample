@@ -4,6 +4,9 @@
  *   白地のヘッダー（左：学会名／右：企業ロゴ）＋ヘッダー直下の装飾画像、ページタイトル、ページ最下部の装飾画像
  */
 
+// ヘッダーのロゴに CSRF トークンを出す（当日の回答数の取得用）。呼び出し側は出力前に survey_session_start() 済みであること
+require_once __DIR__ . '/csrf.php';
+
 // css/js のキャッシュ対策（更新時はこの値を変える）
 const ASSET_VERSION = '20261125a';
 
@@ -25,7 +28,7 @@ function layout_header(): void {
     <header class="site-header">
         <div class="site-header-inner">
             <span class="site-event"><?= htmlspecialchars(EVENT_NAME, ENT_QUOTES, 'UTF-8') ?></span>
-            <img class="site-logo" src="images/tanabe_logo.png" alt="<?= htmlspecialchars(COMPANY_NAME, ENT_QUOTES, 'UTF-8') ?>" width="208" height="27">
+            <img class="site-logo" src="images/tanabe_logo.png" alt="<?= htmlspecialchars(COMPANY_NAME, ENT_QUOTES, 'UTF-8') ?>" width="208" height="27" data-token="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
         </div>
     </header>
     <img class="deco deco-top" src="images/tanabe1.png" alt="" aria-hidden="true" width="1280" height="117">

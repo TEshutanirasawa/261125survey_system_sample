@@ -55,5 +55,7 @@ unset($_SESSION['thanks_ended_early']);
 <!-- スタッフが次の回答者向けに戻す用 -->
 <a href="index.php" class="back-to-top">アンケートページに戻る</a>
 
+<?php layout_script(); ?>
+
 </body>
 </html>

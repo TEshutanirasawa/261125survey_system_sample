@@ -880,6 +880,83 @@
     }
 
     // ============================================================
+    // スタッフ用：ヘッダーのロゴを3秒以内に5回タップすると、当日の回答数を表示する
+    //   回答者には分からない操作にする（4回目までは何も起きない・見た目も変えない）
+    // ============================================================
+    function setupSecretCounter() {
+        var logo = document.querySelector('.site-logo');
+        if (!logo) return;
+        var token = logo.getAttribute('data-token') || '';
+        var WINDOW_MS = 3000, TAPS = 5, SHOW_MS = 5000;
+        var taps = [];
+        var panel = null, hideTimer = null, seq = 0;
+
+        function hide() {
+            if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+            if (panel) panel.hidden = true;
+        }
+
+        function show(lines) {
+            if (!panel) {
+                panel = document.createElement('div');
+                panel.className = 'secret-counter';
+                panel.setAttribute('role', 'status');
+                panel.addEventListener('click', hide);
+                document.body.appendChild(panel);
+            }
+            panel.textContent = '';
+            lines.forEach(function (text, i) {
+                var p = document.createElement('p');
+                if (i === 0) p.className = 'secret-counter-title';
+                p.textContent = text;
+                panel.appendChild(p);
+            });
+            panel.hidden = false;
+            if (hideTimer) clearTimeout(hideTimer);
+            hideTimer = setTimeout(hide, SHOW_MS);
+        }
+
+        function num(v) {
+            if (typeof v !== 'number' || !isFinite(v)) throw new Error('bad value');
+            return v;
+        }
+
+        function load() {
+            var mySeq = ++seq;
+            fetch('api/today_count.php', {
+                headers: { 'X-CSRF-Token': token },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            }).then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            }).then(function (d) {
+                if (mySeq !== seq) return;
+                var m = /^\d{4}-(\d{2})-(\d{2})$/.exec(String(d.date || ''));
+                if (!m) throw new Error('bad date');
+                show([
+                    '本日（' + parseInt(m[1], 10) + '/' + parseInt(m[2], 10) + '）の回答',
+                    '完了 ' + num(d.completed) + '件（医師 ' + num(d.doctor) + '／医師以外 ' + num(d.other) + '）',
+                    '途中離脱 ' + num(d.basic_only) + '件'
+                ]);
+            }).catch(function () {
+                if (mySeq !== seq) return;
+                show(['取得できませんでした']);
+            });
+        }
+
+        logo.addEventListener('click', function () {
+            var now = Date.now();
+            taps.push(now);
+            taps = taps.filter(function (t) { return now - t <= WINDOW_MS; });
+            if (taps.length >= TAPS) {
+                taps = [];
+                load();
+            }
+        });
+    }
+
+    // ============================================================
     // 初期化
     // ============================================================
     function init() {
@@ -890,6 +967,7 @@
         setupStepper();
         setupLightbox();
         setupHaptic();
+        setupSecretCounter();
     }
 
     // ブラウザの「戻る」でキャッシュ（bfcache）から復元された場合は、送信中のまま固まったボタンや
