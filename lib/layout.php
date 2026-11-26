@@ -8,7 +8,7 @@
 require_once __DIR__ . '/csrf.php';
 
 // css/js のキャッシュ対策（更新時はこの値を変える）
-const ASSET_VERSION = '20261125a';
+const ASSET_VERSION = '20261126a';
 
 const EVENT_NAME   = '第71回日本リウマチ学会総会・学術集会';
 const COMPANY_NAME = '田辺ファーマ株式会社';
